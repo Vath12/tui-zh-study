@@ -2,6 +2,7 @@ import time
 
 from blessed import Terminal
 
+from .menu import Menu
 from .stroke_session import StrokeSession
 
 FPS = 30
@@ -10,8 +11,9 @@ PROMPT = '> '
 
 class BlessedStrokeApp:
     '''A full-screen blessed app for StrokeSession: the animated characters,
-    their pinyin and a status line at the top, and an input line at the bottom.
-    Enter clears the input (running it first if it's a /command); Ctrl-C or
+    their pinyin and a status line at the top, then the input line, and the
+    menu (see Menu) at the bottom. Enter clears the input (running it first if
+    it's a /command); Tab switches between typing and the menu; Ctrl-C or
     Ctrl-D quits. The input line edits like a basic prompt: left/right,
     home/end, backspace and delete.'''
 
@@ -19,6 +21,7 @@ class BlessedStrokeApp:
         self.term = Terminal()
         self.running = True
         self.session = StrokeSession(on_quit=self.quit)
+        self.menu = Menu(self.session)
         # blessed passes colors through as they are, so match the terminal.
         if self.term.number_of_colors < 1 << 24:
             self.session.terminal_colors = '256'
@@ -37,6 +40,11 @@ class BlessedStrokeApp:
         before = self.text
         if key == '\x04':                                  # Ctrl-D
             self.quit()
+            return
+        if self.menu.focused and self.menu.handle_key(key):
+            return
+        if name == 'KEY_TAB' or key == '\t':
+            self.menu.focused = True
         elif name == 'KEY_ENTER' or key in ('\r', '\n'):
             self.session.submit(self.text)
             self.text, self.cursor = '', 0
@@ -65,28 +73,50 @@ class BlessedStrokeApp:
     def frame(self) -> str:
         '''The whole screen as one string, written in one go to avoid flicker.'''
         t, s = self.term, self.session
-        lines = (s.characters().split('\n') if s.slots else []) + [s.pinyin()]
-        lines += ['']*(t.height-1-len(lines))
-        lines[-1] = t.dim(s.status())
+        menu = self.menu.lines(t)   # empty unless the menu is focused
+        # From the bottom: the menu, then the input line just above it, then
+        # the characters and pinyin (unless hidden) filling the rest, with the
+        # status line last. If the characters are too tall, they're cut off at
+        # the bottom, so the pinyin and status lines always show.
+        input_row = max(0, t.height - len(menu) - 1)
+        under = [s.pinyin()] if s.show_pinyin else []
+        chars = s.characters().split('\n') if s.slots else []
+        lines = chars[:max(0, input_row - 1 - len(under))] + under
+        lines += [''] * (input_row - len(lines))
+        lines = lines[:input_row]
+        if lines:
+            lines[-1] = t.dim(s.status())
+        lines += [self.input_line()] + menu
+
         out = [t.home]
-
-        for y, line in enumerate(lines[:t.height - 1]):
+        for y, line in enumerate(lines[:t.height]):
             out.append(t.move_xy(0, y) + t.truncate(line, t.width) + t.normal + t.clear_eol)
-
-        out.append(t.move_xy(0, len(lines)) + t.clear_eos)
-        # The input line sits at the bottom, with the cursor where you're typing.
-        bottom = t.height - 1
-        out.append(t.move_xy(0, bottom) + t.truncate(PROMPT + self.text, t.width) + t.clear_eol)
-        out.append(t.move_xy(min(t.length(PROMPT + self.text[:self.cursor]), t.width - 1), bottom))
+        if self.menu.focused:
+            out.append(t.hide_cursor)
+        else:
+            # The cursor goes where you're typing.
+            x = min(t.length(PROMPT + self.text[:self.cursor]), t.width - 1)
+            out.append(t.normal_cursor + t.move_xy(x, input_row))
         return ''.join(out)
+
+    def input_line(self) -> str:
+        '''The prompt and what you've typed, with a hint for the menu at the
+        right while it's hidden (if there's room).'''
+        t = self.term
+        line = PROMPT + self.text
+        if not self.menu.focused:
+            room = t.width - t.length(line) - len(Menu.HINT) - 1
+            if room >= 2:
+                line += ' ' * room + t.dim(Menu.HINT)
+        return line
 
     def draw(self):
         size = (self.term.width, self.term.height)
         if size != self.last_size:
-            # Show as many characters as fit the new width, and redraw from scratch.
-            self.session.set_n_chars(self.session.fit_chars(self.term.width))
             print(self.term.clear, end='')
             self.last_size, self.last_frame = size, ''
+        # Show as many characters as fit the width (which depends on the rendering mode too).
+        self.session.set_n_chars(self.session.fit_chars(self.term.width))
         frame = self.frame()
         if frame != self.last_frame:
             print(frame, end='', flush=True)

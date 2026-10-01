@@ -34,7 +34,7 @@ class StrokeApp:
             layout=Layout(HSplit([
                 # Height is a callable so the window follows the canvas when the rendering mode changes.
                 Window(FormattedTextControl(lambda: ANSI(s.characters())), height=lambda: s.rows),
-                Window(FormattedTextControl(s.pinyin), height=1),
+                Window(FormattedTextControl(s.pinyin), height=lambda: 1 if s.show_pinyin else 0),
                 Window(FormattedTextControl(s.status), height=1),
                 self.input,
             ]), focused_element=self.input),

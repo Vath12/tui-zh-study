@@ -12,13 +12,16 @@ GAP = '  '  # between characters
 MAX_CHARS = 8
 
 # rendering_mode name -> the canvas glyphs it uses.
-RENDERING_MODES = {'dots': 'braille', 'quadrants': 'quadrant', 'octants': 'octant'}
+RENDERING_MODES = {'dots': 'braille', 'squares': 'octant'}
 BLEND_MODES = ['majority', 'blend']
 # color_mode name -> ZiAnimation options. mono: strokes white, the one being drawn red.
 COLOR_MODES = {
     'multicolor': {'colored': True},
     'mono': {'colored': False, 'color': WHITE, 'drawing_color': RED},
 }
+# speed name -> seconds per stroke: 80% drawing it, 20% pause before the next.
+SPEEDS = {'0.1s': 0.1, '0.25s': 0.25, '0.5s': 0.5, '0.75s': 0.75, '1s': 1}
+PINYIN_MODES = ['show', 'hide']
 
 
 @dataclass
@@ -61,8 +64,10 @@ class StrokeSession:
 
         self.n_chars = 4
         self.blend_mode = 'majority'
-        self.rendering_mode = 'octants'
+        self.rendering_mode = 'squares'
         self.color_mode = 'multicolor'
+        self.speed = '0.5s'
+        self.pinyin_mode = 'show'
         # The terminal's colors, for TerminalCanvas: 'truecolor' or '256'. A UI
         # that converts colors itself (prompt_toolkit does) can leave it.
         self.terminal_colors = 'truecolor'
@@ -72,6 +77,8 @@ class StrokeSession:
             'render': (self.cmd_render, f'set how the character is drawn: {", ".join(RENDERING_MODES)}'),
             'blend': (self.cmd_blend, f'set how a cell picks its color: {", ".join(BLEND_MODES)}'),
             'color': (self.cmd_color, f'set the stroke colors: {", ".join(COLOR_MODES)}'),
+            'speed': (self.cmd_speed, f'time per stroke: {", ".join(SPEEDS)}'),
+            'pinyin': (self.cmd_pinyin, f'show or hide the pinyin: {", ".join(PINYIN_MODES)}'),
             'chars': (self.cmd_chars, f'how many characters to show side by side (1-{MAX_CHARS})'),
             'quit': (self.cmd_quit, 'exit'),
         }
@@ -87,7 +94,9 @@ class StrokeSession:
         canvas.color_mode = self.terminal_colors
 
     def new_animation(self, char : str, canvas : TerminalCanvas) -> ZiAnimation:
-        return ZiAnimation(HanziStroke.get_strokes(char), canvas, **COLOR_MODES[self.color_mode])
+        per_stroke = SPEEDS[self.speed]
+        return ZiAnimation(HanziStroke.get_strokes(char), canvas, **COLOR_MODES[self.color_mode],
+                           stroke_time=per_stroke * 0.8, pause=per_stroke * 0.2)
 
     def show(self, chars : list[tuple[str, list[str]]]):
         '''Show the last n_chars of `chars` (character, pinyin). A character
@@ -158,6 +167,23 @@ class StrokeSession:
             self.apply_modes(slot.canvas)
         return f'cell colors by {args[0]}'
 
+    def cmd_speed(self, args : list[str]) -> str:
+        if len(args) != 1 or args[0] not in SPEEDS:
+            return f'usage: /speed {"|".join(SPEEDS)}  (now {self.speed})'
+        self.speed = args[0]
+        for slot in self.slots:
+            # Carry on from the same point in the animation, at the new speed.
+            done = (slot.elapsed() % slot.animation.duration) / slot.animation.duration
+            slot.animation = self.new_animation(slot.char, slot.canvas)
+            slot.started = time.monotonic() - done * slot.animation.duration
+        return f'speed: {args[0]} per stroke'
+
+    def cmd_pinyin(self, args : list[str]) -> str:
+        if len(args) != 1 or args[0] not in PINYIN_MODES:
+            return f'usage: /pinyin {"|".join(PINYIN_MODES)}  (now {self.pinyin_mode})'
+        self.pinyin_mode = args[0]
+        return f'pinyin: {args[0]}'
+
     def cmd_color(self, args : list[str]) -> str:
         if len(args) != 1 or args[0] not in COLOR_MODES:
             return f'usage: /color {"|".join(COLOR_MODES)}  (now {self.color_mode})'
@@ -210,8 +236,15 @@ class StrokeSession:
         columns = [s.canvas.render().split('\n') for s in self.slots]
         return '\n'.join(GAP.join(line) for line in zip(*columns))
 
+    @property
+    def show_pinyin(self) -> bool:
+        '''Whether the UI should show the pinyin line at all.'''
+        return self.pinyin_mode == 'show'
+
     def pinyin(self) -> str:
-        '''Each character's pinyin, centered under its canvas.'''
+        '''Each character's pinyin, centered under its canvas ('' if hidden).'''
+        if not self.show_pinyin:
+            return ''
         return GAP.join(' / '.join(s.pinyin).center(s.canvas.cols) for s in self.slots)
 
     def status(self) -> str:
