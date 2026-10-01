@@ -117,14 +117,19 @@ class ZiAnimation:
     the animation: the whole character faintly in `ghost`, the finished strokes,
     and the current stroke up to how far the brush has got. Each stroke takes
     `stroke_time` seconds, with `pause` between strokes; after the last one the
-    finished character stays up for `hold` seconds, then it starts over.'''
+    finished character stays up for `hold` seconds, then it starts over.
+
+    Strokes are colored as in draw_zi (`colored` / `color`). If `drawing_color`
+    is set, the stroke being drawn is that color until it's finished.'''
 
     def __init__(self, zi : Zi, canvas : TerminalCanvas, colored : bool = True, color : tuple[int, ...] = WHITE,
+                 drawing_color : tuple[int, ...] | None = None,
                  stroke_time : float = 0.5, pause : float = 0.15, hold : float = 1.5,
                  ghost : tuple[int, ...] | None = (70, 70, 70, 255)):
         self.zi = zi
         self.canvas = canvas
         self.colors = stroke_colors(zi.n_strokes) if colored else [color] * zi.n_strokes
+        self.drawing_color = drawing_color
         self.stroke_time, self.pause, self.hold = stroke_time, pause, hold
         self.ghost = ghost
         self.progress = [stroke_progress(d, m, canvas.width, canvas.height) for d, m in zip(zi.strokes, zi.medians)]
@@ -146,6 +151,8 @@ class ZiAnimation:
             if done <= 0:
                 break
             shown = p <= min(done, 1)          # NaN (outside the stroke) compares False
+            if done < 1 and self.drawing_color:
+                c = self.drawing_color
             pixels[shown, :len(c)] = c
             if len(c) == 3:
                 pixels[shown, 3] = 255
