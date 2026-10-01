@@ -1,5 +1,6 @@
 import asyncio
 import time
+from dataclasses import dataclass
 
 from prompt_toolkit import Application
 from prompt_toolkit.formatted_text import ANSI
@@ -11,9 +12,12 @@ from prompt_toolkit.widgets import TextArea
 from .strokes.render import RED, WHITE, TerminalCanvas
 from .strokes.stroke import HanziStroke
 from .strokes.stroke_render import ZiAnimation
+from .vocabulary.hsk import HSKDictionary
 
-SIZE = 80   # canvas size in pixels
+SIZE = 80   # canvas size in pixels, per character
 FPS = 30
+GAP = '  '  # between characters
+MAX_CHARS = 8
 
 # rendering_mode name -> the canvas glyphs it uses.
 RENDERING_MODES = {'dots': 'braille', 'quadrants': 'quadrant', 'octants': 'octant'}
@@ -25,10 +29,25 @@ COLOR_MODES = {
 }
 
 
+@dataclass
+class Slot:
+    '''One character on screen, with its own canvas and animation.'''
+    canvas : TerminalCanvas
+    animation : ZiAnimation
+    started : float
+
+    @property
+    def char(self) -> str:
+        return self.animation.zi.unicode
+
+    def elapsed(self) -> float:
+        return time.monotonic() - self.started
+
+
 class StrokeApp:
     '''An inline terminal app: type characters in the input line and the window
-    above animates the strokes of the last one you typed. Enter clears the
-    input; Ctrl-C or Ctrl-D quits.
+    above animates the strokes of the last `n_chars` you typed, side by side,
+    with their pinyin underneath. Enter clears the input; Ctrl-C or Ctrl-D quits.
 
     Input starting with / is a command, run on Enter: "/name arg ...". Commands
     live in self.commands as name -> (callback, help). A callback gets the
@@ -37,21 +56,22 @@ class StrokeApp:
 
     def __init__(self):
         HanziStroke._load_lazy()
-        self.canvas = TerminalCanvas(SIZE, SIZE)
-        self.animation : ZiAnimation | None = None
-        self.started = 0.0
+        HSKDictionary._load_lazy()
+        self.slots : list[Slot] = []
+        self.typed : list[str] = []   # the characters (with stroke data) in the last non-empty input
         self.message = ''
 
+        self.n_chars = 2
         self.blend_mode = 'majority'
         self.rendering_mode = 'dots'
         self.color_mode = 'multicolor'
-        self.apply_modes()
 
         self.commands = {
             'help': (self.cmd_help, 'list commands'),
             'render': (self.cmd_render, f'set how the character is drawn: {", ".join(RENDERING_MODES)}'),
             'blend': (self.cmd_blend, f'set how a cell picks its color: {", ".join(BLEND_MODES)}'),
             'color': (self.cmd_color, f'set the stroke colors: {", ".join(COLOR_MODES)}'),
+            'chars': (self.cmd_chars, f'how many characters to show side by side (1-{MAX_CHARS})'),
             'quit': (self.cmd_quit, 'exit'),
         }
 
@@ -67,7 +87,8 @@ class StrokeApp:
         self.app = Application(
             layout=Layout(HSplit([
                 # Height is a callable so the window follows the canvas when the rendering mode changes.
-                Window(FormattedTextControl(lambda: ANSI(self.canvas.render())), height=lambda: self.canvas.rows),
+                Window(FormattedTextControl(lambda: ANSI(self.characters())), height=lambda: self.rows),
+                Window(FormattedTextControl(self.pinyin), height=1),
                 Window(FormattedTextControl(self.status), height=1),
                 self.input,
             ]), focused_element=self.input),
@@ -75,9 +96,30 @@ class StrokeApp:
             full_screen=False,
         )
 
-    def apply_modes(self):
-        self.canvas.glyphs = RENDERING_MODES[self.rendering_mode]
-        self.canvas.cell_color = self.blend_mode
+    def new_canvas(self) -> TerminalCanvas:
+        canvas = TerminalCanvas(SIZE, SIZE)
+        self.apply_modes(canvas)
+        return canvas
+
+    def apply_modes(self, canvas : TerminalCanvas):
+        canvas.glyphs = RENDERING_MODES[self.rendering_mode]
+        canvas.cell_color = self.blend_mode
+
+    def new_animation(self, char : str, canvas : TerminalCanvas) -> ZiAnimation:
+        return ZiAnimation(HanziStroke.get_strokes(char), canvas, **COLOR_MODES[self.color_mode])
+
+    def show(self, chars : list[str]):
+        '''Show the last n_chars of `chars`. A character that's already on
+        screen keeps its animation (and where it's got to), even if it moves.'''
+        old, self.slots = self.slots, []
+        for char in chars[-self.n_chars:]:
+            same = next((s for s in old if s.char == char), None)
+            if same:
+                old.remove(same)
+                self.slots.append(same)
+            else:
+                canvas = self.new_canvas()
+                self.slots.append(Slot(canvas, self.new_animation(char, canvas), time.monotonic()))
 
     def on_accept(self, buffer) -> bool:
         '''Enter: run the command if it's one, then clear the input.'''
@@ -99,27 +141,33 @@ class StrokeApp:
         if len(args) != 1 or args[0] not in RENDERING_MODES:
             return f'usage: /render {"|".join(RENDERING_MODES)}  (now {self.rendering_mode})'
         self.rendering_mode = args[0]
-        self.apply_modes()
+        for slot in self.slots:
+            self.apply_modes(slot.canvas)
         return f'rendering with {args[0]}'
 
     def cmd_blend(self, args : list[str]) -> str:
         if len(args) != 1 or args[0] not in BLEND_MODES:
             return f'usage: /blend {"|".join(BLEND_MODES)}  (now {self.blend_mode})'
         self.blend_mode = args[0]
-        self.apply_modes()
+        for slot in self.slots:
+            self.apply_modes(slot.canvas)
         return f'cell colors by {args[0]}'
 
     def cmd_color(self, args : list[str]) -> str:
         if len(args) != 1 or args[0] not in COLOR_MODES:
             return f'usage: /color {"|".join(COLOR_MODES)}  (now {self.color_mode})'
         self.color_mode = args[0]
-        if self.animation:
+        for slot in self.slots:
             # Same character, new colors; keep the timing so it carries on where it was.
-            self.animation = self.new_animation(self.animation.zi)
+            slot.animation = self.new_animation(slot.char, slot.canvas)
         return f'colors: {args[0]}'
 
-    def new_animation(self, zi) -> ZiAnimation:
-        return ZiAnimation(zi, self.canvas, **COLOR_MODES[self.color_mode])
+    def cmd_chars(self, args : list[str]) -> str:
+        if len(args) != 1 or not args[0].isdigit() or not 1 <= int(args[0]) <= MAX_CHARS:
+            return f'usage: /chars 1-{MAX_CHARS}  (now {self.n_chars})'
+        self.n_chars = int(args[0])
+        self.show(self.typed)
+        return f'showing {self.n_chars} character{"s" if self.n_chars > 1 else ""}'
 
     def cmd_quit(self, args : list[str]) -> None:
         self.app.exit()
@@ -131,31 +179,45 @@ class StrokeApp:
             matches = [f'/{name}' for name in self.commands if name.startswith(typed)]
             self.message = '  '.join(matches) if matches else f'unknown command /{typed}'
             return
-        # Animate the last character that has stroke data; leave the current
-        # animation up if there isn't one (e.g. the input was just cleared).
-        for char in reversed(buffer.text):
-            if char in HanziStroke.stroke_data:
-                if not self.animation or self.animation.zi.unicode != char:
-                    self.animation = self.new_animation(HanziStroke.get_strokes(char))
-                    self.started = time.monotonic()
-                self.message = ''
-                return
-        if buffer.text.strip():
+        # Animate the last characters that have stroke data; leave the current
+        # ones up if there aren't any (e.g. the input was just cleared).
+        chars = [c for c in buffer.text if c in HanziStroke.stroke_data]
+        if chars:
+            self.typed = chars
+            self.show(chars)
+            self.message = ''
+        elif buffer.text.strip():
             self.message = 'no stroke data for that'
+
+    @property
+    def rows(self) -> int:
+        return max((s.canvas.rows for s in self.slots), default=0)
+
+    def characters(self) -> str:
+        '''The characters' canvases side by side.'''
+        columns = [s.canvas.render().split('\n') for s in self.slots]
+        return '\n'.join(GAP.join(line) for line in zip(*columns))
+
+    def pinyin(self) -> str:
+        '''Each character's pinyin, centered under its canvas.'''
+        return GAP.join(' / '.join(HSKDictionary.readings(s.char)).center(s.canvas.cols) for s in self.slots)
 
     def status(self) -> str:
         if self.message:
             return self.message
-        if not self.animation:
+        if not self.slots:
             return 'type a character'
-        zi = self.animation.zi
-        stroke = self.animation.stroke_at(time.monotonic() - self.started)
-        return f'{zi.unicode}  stroke {min(stroke + 1, zi.n_strokes)}/{zi.n_strokes}'
+        strokes = []
+        for s in self.slots:
+            zi = s.animation.zi
+            stroke = min(s.animation.stroke_at(s.elapsed()) + 1, zi.n_strokes)
+            strokes.append(f'{zi.unicode} {stroke}/{zi.n_strokes}')
+        return '   '.join(strokes)
 
     async def animate(self):
         while True:
-            if self.animation:
-                self.animation.draw(time.monotonic() - self.started)
+            for slot in self.slots:
+                slot.animation.draw(slot.elapsed())
             self.app.invalidate()
             await asyncio.sleep(1 / FPS)
 

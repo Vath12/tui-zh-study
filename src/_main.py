@@ -1,12 +1,9 @@
-from .parse import parse_hsk_pinyin, word_lists, LEVELS, find_vocab_matches, load_vocab
+from .vocabulary.vocab import find_vocab_matches, load_vocab
 import random
 
 if __name__ == "__main__":
-    hsk = parse_hsk_pinyin()
-    words = word_lists(hsk)
-
     test_set = []
-    for item, m in find_vocab_matches(load_vocab(), hsk).items():
+    for item, m in find_vocab_matches(load_vocab()).items():
         test_set.append((item, m.pinyin))
 
     next_set = list(test_set)
