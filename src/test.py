@@ -215,10 +215,27 @@ class TestApp(BlessedStrokeApp):
                                 PROMPT + self.text,
                                 None if self.menu.focused else t.length(PROMPT + self.text[:self.cursor]))
         if self.state == 'result':
-            if ''.join(self.result.split()) == self.answer:
-                verdict = t.green(f'✓ Right: {self.answer}')
-            else:
-                verdict = t.red(f'✗ You typed {self.result}, it was {self.answer}')
+            correct = [False]*len(self.answer)
+            for i,gt in enumerate(self.answer):
+                if i >= len(self.result):
+                    break
+                correct[i] = self.result[i].strip() == self.answer[i]
+
+            n_correct = sum([(1 if x else 0) for x in correct])
+            
+            #if ''.join(self.result.split()) == self.answer:
+            #    verdict = t.green(f'✓ Right: {self.answer}')
+            #else:
+            #    verdict = t.red(f'✗ You typed {self.result}, it was {self.answer}')
+
+            _f_c = t.green if n_correct == len(self.answer) else t.red
+            verdict = _f_c(f'You got {n_correct}/{len(self.answer)} \"{self.result}\" vs \"{("").join(self.answer)}\"')
+            
+            py_fmt = []
+            for i,c in enumerate(correct):
+                py_fmt.append('\033[38;2;0;255;0m' if c else '\033[38;2;255;0;0m')
+            pinyin = [s.format_pinyin(py_fmt)]
+
             return self.compose(chars, pinyin, message or f'{verdict}  {self.prompt()}   {self.score()}',
                                 t.dim('Enter: next question'), None)
         # writing: just the pinyin until you reveal the strokes.

@@ -261,6 +261,12 @@ class StrokeSession:
             return ''
         return GAP.join(' / '.join(s.pinyin).center(s.canvas.cols) for s in self.slots)
 
+    def format_pinyin(self, codes) -> str:
+        if not self.show_pinyin:
+            return ''
+        return GAP.join((c + (' / '.join(s.pinyin).center(s.canvas.cols)) + '\033m') for c,s in zip(codes,self.slots))
+
+
     def status(self) -> str:
         if self.message:
             return self.message
