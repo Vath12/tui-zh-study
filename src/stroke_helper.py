@@ -35,6 +35,7 @@ class Slot:
     canvas : TerminalCanvas
     animation : ZiAnimation
     started : float
+    pinyin : list[str]   # its reading(s) in the word it was typed in
 
     @property
     def char(self) -> str:
@@ -58,7 +59,9 @@ class StrokeApp:
         HanziStroke._load_lazy()
         HSKDictionary._load_lazy()
         self.slots : list[Slot] = []
-        self.typed : list[str] = []   # the characters (with stroke data) in the last non-empty input
+        # The characters (with stroke data) in the last non-empty input, each
+        # with its pinyin in context.
+        self.typed : list[tuple[str, list[str]]] = []
         self.message = ''
 
         self.n_chars = 2
@@ -108,18 +111,20 @@ class StrokeApp:
     def new_animation(self, char : str, canvas : TerminalCanvas) -> ZiAnimation:
         return ZiAnimation(HanziStroke.get_strokes(char), canvas, **COLOR_MODES[self.color_mode])
 
-    def show(self, chars : list[str]):
-        '''Show the last n_chars of `chars`. A character that's already on
-        screen keeps its animation (and where it's got to), even if it moves.'''
+    def show(self, chars : list[tuple[str, list[str]]]):
+        '''Show the last n_chars of `chars` (character, pinyin). A character
+        that's already on screen keeps its animation (and where it's got to),
+        even if it moves.'''
         old, self.slots = self.slots, []
-        for char in chars[-self.n_chars:]:
+        for char, pinyin in chars[-self.n_chars:]:
             same = next((s for s in old if s.char == char), None)
             if same:
                 old.remove(same)
+                same.pinyin = pinyin
                 self.slots.append(same)
             else:
                 canvas = self.new_canvas()
-                self.slots.append(Slot(canvas, self.new_animation(char, canvas), time.monotonic()))
+                self.slots.append(Slot(canvas, self.new_animation(char, canvas), time.monotonic(), pinyin))
 
     def on_accept(self, buffer) -> bool:
         '''Enter: run the command if it's one, then clear the input.'''
@@ -180,8 +185,10 @@ class StrokeApp:
             self.message = '  '.join(matches) if matches else f'unknown command /{typed}'
             return
         # Animate the last characters that have stroke data; leave the current
-        # ones up if there aren't any (e.g. the input was just cleared).
-        chars = [c for c in buffer.text if c in HanziStroke.stroke_data]
+        # ones up if there aren't any (e.g. the input was just cleared). The
+        # pinyin comes from the whole input, so characters in a word get the
+        # word's reading (谢谢 xièxie, 银行 yínháng).
+        chars = [(c, p) for c, p in HSKDictionary.text_pinyin(buffer.text) if c in HanziStroke.stroke_data]
         if chars:
             self.typed = chars
             self.show(chars)
@@ -200,7 +207,7 @@ class StrokeApp:
 
     def pinyin(self) -> str:
         '''Each character's pinyin, centered under its canvas.'''
-        return GAP.join(' / '.join(HSKDictionary.readings(s.char)).center(s.canvas.cols) for s in self.slots)
+        return GAP.join(' / '.join(s.pinyin).center(s.canvas.cols) for s in self.slots)
 
     def status(self) -> str:
         if self.message:

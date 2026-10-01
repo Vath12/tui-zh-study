@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .pinyin import has_tone, split_pinyin
+from .pinyin import has_tone, split_pinyin, yi_bu_sandhi
 
 HSK_DIR = Path(__file__).parent.parent.parent / "resources" / "hsk"
 LEVELS = ["1", "2", "3", "4", "5", "6", "7-9"]
@@ -90,6 +90,8 @@ class HSKDictionary:
     entries: list[HSKEntry] | None = None
     by_word: dict[str, list[HSKEntry]] = {}
     by_char: dict[str, list[HSKEntry]] = {}  # entries whose word contains the character
+    longest: int = 1                         # characters in the longest word
+    _syllables: dict[str, list[str] | None] = {}  # word_syllables cache
 
     @classmethod
     def _load_lazy(cls):
@@ -100,6 +102,7 @@ class HSKDictionary:
             cls.by_word.setdefault(e.word, []).append(e)
             for c in dict.fromkeys(e.word):
                 cls.by_char.setdefault(c, []).append(e)
+        cls.longest = max(map(len, cls.by_word))
 
     @classmethod
     def lookup(cls, word: str) -> list[HSKEntry]:
@@ -122,3 +125,71 @@ class HSKDictionary:
             return list(dict.fromkeys(e.pinyin for e in exact))
         found = pinyin_from_words(char, cls.containing(char)) if len(char) == 1 else None
         return [found[0]] if found else []
+
+    @classmethod
+    def word_syllables(cls, word: str) -> list[str] | None:
+        """One syllable per character of an HSK word, from the earliest entry
+        whose pinyin lines up with it (e.g. 银行 -> ["yín", "háng"]). An erhua
+        word's final r goes to its 儿 (一点儿 yìdiǎnr -> ["yì", "diǎn", "r"]).
+        None if `word` isn't an HSK word or its pinyin doesn't line up."""
+        if word not in cls._syllables:
+            cls._syllables[word] = cls._find_syllables(word)
+        return cls._syllables[word]
+
+    @classmethod
+    def _find_syllables(cls, word: str) -> list[str] | None:
+        for e in cls.lookup(word):
+            pinyin = e.pinyin.lower()
+            syllables = split_pinyin(pinyin)
+            if syllables is not None and len(syllables) == len(word):
+                return syllables
+            # Erhua: the 儿 is just an r on the syllable before (这儿 zhèr).
+            if word.endswith("儿") and pinyin.endswith("r"):
+                syllables = split_pinyin(pinyin[:-1])
+                if syllables is not None and len(syllables) == len(word) - 1:
+                    return [*syllables, "r"]
+        return None
+
+    @classmethod
+    def segment(cls, text: str) -> list[str]:
+        """Split text into HSK words, using as few pieces as possible (so
+        longer words win). Anything that isn't part of a word is its own
+        one-character piece."""
+        cls._load_lazy()
+        # best[i]: fewest pieces for text[:i], and the length of the last piece.
+        best = [(0, 0)] + [(len(text) + 1, 1)] * len(text)
+        for end in range(1, len(text) + 1):
+            for size in range(1, min(cls.longest, end) + 1):
+                if size > 1 and cls.word_syllables(text[end - size:end]) is None:
+                    continue
+                pieces = best[end - size][0] + 1
+                if pieces < best[end][0]:
+                    best[end] = (pieces, size)
+        words, end = [], len(text)
+        while end:
+            size = best[end][1]
+            words.append(text[end - size:end])
+            end -= size
+        return words[::-1]
+
+    @classmethod
+    def text_pinyin(cls, text: str) -> list[tuple[str, list[str]]]:
+        """Each character of `text` with its pinyin in context: the syllable
+        from the HSK word it's part of (谢谢 -> xiè, xie), or else its own
+        readings (好 -> hǎo, hào), with 一 and 不 changing tone to fit the
+        next syllable (一个 -> yí gè). Characters with no pinyin get []."""
+        result, alone = [], []  # alone[i]: result[i] isn't part of a word
+        for word in cls.segment(text):
+            if len(word) > 1:
+                result += [(c, [s]) for c, s in zip(word, cls.word_syllables(word))]
+                alone += [False] * len(word)
+            else:
+                result.append((word, cls.readings(word)))
+                alone.append(True)
+        # Words already have 一 and 不 in the right tone (一点儿 yìdiǎnr), so
+        # only change the ones standing alone, from the next syllable.
+        for i, (char, readings) in enumerate(result):
+            if alone[i] and char in "一不" and len(readings) == 1 and i + 1 < len(result) and result[i + 1][1]:
+                prev = result[i - 1][0] if i else None
+                result[i] = (char, [yi_bu_sandhi(char, readings[0], result[i + 1][1][0], prev)])
+        return result

@@ -42,3 +42,41 @@ def _split_chunk(chunk: str) -> list[str] | None:
 
 def has_tone(syllable: str) -> bool:
     return syllable.translate(TONELESS) != syllable
+
+
+TONE_MARKS = {c: i % 4 + 1 for i, c in enumerate("āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ")}
+
+
+def tone(syllable: str) -> int:
+    """A syllable's tone, 1-4, or 5 for the neutral tone (no mark)."""
+    return next((TONE_MARKS[c] for c in syllable if c in TONE_MARKS), 5)
+
+
+def set_tone(syllable: str, new: int) -> str:
+    """The syllable with its tone mark changed to tone `new` (1-4)."""
+    for i, c in enumerate(syllable):
+        if c in TONE_MARKS:
+            base = "aaaaeeeeiiiioooouuuuüüüü"["āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ".index(c)]
+            marked = "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ"["aeiouü".index(base) * 4 + new - 1]
+            return syllable[:i] + marked + syllable[i + 1:]
+    return syllable
+
+
+NUMBERS = set("零一二三四五六七八九十百千万亿两第")
+
+
+def yi_bu_sandhi(char: str, syllable: str, next_syllable: str | None, prev_char: str | None = None) -> str:
+    """The tone changes of 一 and 不 that pinyin writes, from the syllable after:
+    不 bù -> bú before a 4th tone; 一 yī -> yí before a 4th tone and yì before
+    any other tone. At the end (no next syllable) they keep their own tone, and
+    so does 一 in ordinals and numbers (第一 dìyī, 十一 shíyī). This doesn't know
+    about dates and counting in general, where 一 also stays yī (一月 yīyuè)."""
+    if next_syllable is None or tone(next_syllable) == 5:
+        return syllable
+    if char == "一" and prev_char in NUMBERS:
+        return syllable
+    if char == "不" and syllable == "bù" and tone(next_syllable) == 4:
+        return "bú"
+    if char == "一" and syllable == "yī":
+        return set_tone(syllable, 2 if tone(next_syllable) == 4 else 4)
+    return syllable
