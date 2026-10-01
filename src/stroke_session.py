@@ -60,7 +60,7 @@ class StrokeSession:
         # with its pinyin in context.
         self.typed : list[tuple[str, list[str]]] = []
         self.message = ''
-        self.char_size=SIZE
+        self.char_size = SIZE   # canvas size in pixels, per character
 
         self.n_chars = 4
         self.blend_mode = 'majority'
@@ -84,7 +84,7 @@ class StrokeSession:
         }
 
     def new_canvas(self) -> TerminalCanvas:
-        canvas = TerminalCanvas(SIZE, SIZE)
+        canvas = TerminalCanvas(self.char_size, self.char_size)
         self.apply_modes(canvas)
         return canvas
 
@@ -97,6 +97,20 @@ class StrokeSession:
         per_stroke = SPEEDS[self.speed]
         return ZiAnimation(HanziStroke.get_strokes(char), canvas, **COLOR_MODES[self.color_mode],
                            stroke_time=per_stroke * 0.8, pause=per_stroke * 0.2)
+
+    def present(self, chars : list[tuple[str, list[str]]]):
+        '''Show these characters (character, pinyin), as if they'd been typed.
+        For UIs that pick the characters themselves rather than from input.'''
+        self.typed = chars
+        self.show(chars)
+
+    def set_char_size(self, size : int):
+        '''Change the canvas size (pixels per character), redrawing what's shown
+        at the new size. The animations start over.'''
+        if size != self.char_size:
+            self.char_size = size
+            self.slots = []
+            self.show(self.typed)
 
     def show(self, chars : list[tuple[str, list[str]]]):
         '''Show the last n_chars of `chars` (character, pinyin). A character
@@ -211,7 +225,7 @@ class StrokeSession:
     @property
     def char_cols(self) -> int:
         '''Terminal columns one character takes with the current rendering mode.'''
-        return -(-SIZE // GLYPHS[RENDERING_MODES[self.rendering_mode]].width)
+        return -(-self.char_size // GLYPHS[RENDERING_MODES[self.rendering_mode]].width)
 
     def fit_chars(self, width : int) -> int:
         '''How many characters fit side by side in `width` columns (at least 1).'''

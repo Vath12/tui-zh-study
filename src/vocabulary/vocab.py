@@ -15,12 +15,16 @@ class VocabMatch:
     pinyin_from: HSKEntry | None  # the word the pinyin was taken from, if not exact
 
 
-def load_vocab(vocab_dir: Path = VOCAB_DIR) -> list[str]:
-    """Read every .txt file in vocab_dir, taking the first token of each line
-    (so lines can be "字" or "字 pinyin"). Duplicates are dropped."""
+def load_vocab(source: Path = VOCAB_DIR) -> list[str]:
+    """Read a vocab .txt file, or every .txt file in a directory, taking the
+    first token of each line (so lines can be "字" or "字 pinyin"). Lines
+    starting with # are comments. Duplicates are dropped."""
+    source = Path(source)
     items = []
-    for path in sorted(vocab_dir.glob("*.txt")):
-        items += [line.split()[0] for line in path.read_text(encoding="utf-8").splitlines() if line.split()]
+    for path in [source] if source.is_file() else sorted(source.glob("*.txt")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.split() and not line.lstrip().startswith("#"):
+                items.append(line.split()[0])
     return list(dict.fromkeys(items))
 
 

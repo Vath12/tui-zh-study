@@ -48,7 +48,16 @@ class BlessedStrokeApp:
         elif name == 'KEY_ENTER' or key in ('\r', '\n'):
             self.session.submit(self.text)
             self.text, self.cursor = '', 0
-        elif name == 'KEY_BACKSPACE' or key in ('\x7f', '\x08'):
+        else:
+            self.edit_text(key)
+        if self.text != before:
+            self.session.input_changed(self.text)
+
+    def edit_text(self, key) -> bool:
+        '''Line editing for the input: typing, backspace/delete, left/right,
+        home/end. Returns whether the key was one of those.'''
+        name = key.name if key.is_sequence else None
+        if name == 'KEY_BACKSPACE' or key in ('\x7f', '\x08'):
             if self.cursor:
                 self.text = self.text[:self.cursor - 1] + self.text[self.cursor:]
                 self.cursor -= 1
@@ -65,38 +74,44 @@ class BlessedStrokeApp:
         elif not key.is_sequence and key.isprintable() and key:
             self.text = self.text[:self.cursor] + key + self.text[self.cursor:]
             self.cursor += len(key)
-        if self.text != before:
-            self.session.input_changed(self.text)
+        else:
+            return False
+        return True
 
     # Output
 
     def frame(self) -> str:
         '''The whole screen as one string, written in one go to avoid flicker.'''
-        t, s = self.term, self.session
-        menu = self.menu.lines(t)   # empty unless the menu is focused
-        # From the bottom: the menu, then the input line just above it, then
-        # the characters and pinyin (unless hidden) filling the rest, with the
-        # status line last. If the characters are too tall, they're cut off at
-        # the bottom, so the pinyin and status lines always show.
-        input_row = max(0, t.height - len(menu) - 1)
-        under = [s.pinyin()] if s.show_pinyin else []
+        s = self.session
         chars = s.characters().split('\n') if s.slots else []
-        lines = chars[:max(0, input_row - 1 - len(under))] + under
-        lines += [''] * (input_row - len(lines))
-        lines = lines[:input_row]
+        under = [s.pinyin()] if s.show_pinyin else []
+        cursor = None if self.menu.focused else self.term.length(PROMPT + self.text[:self.cursor])
+        return self.compose(chars, under, s.status(), self.input_line(), cursor)
+
+    def compose(self, top : list[str], under : list[str], status : str, bottom : str, cursor : int | None) -> str:
+        '''Lay out a screen. From the bottom: the menu (if focused), then
+        `bottom` (the input line) just above it, then `top` (the characters)
+        and `under` (their pinyin) filling the rest, with `status` last. If
+        `top` is too tall it's cut off at the bottom, so `under` and the status
+        line always show. `cursor` is the column for the cursor on the bottom
+        line, or None to hide it.'''
+        t = self.term
+        menu = self.menu.lines(t)   # empty unless the menu is focused
+        bottom_row = max(0, t.height - len(menu) - 1)
+        lines = top[:max(0, bottom_row - 1 - len(under))] + under
+        lines += [''] * (bottom_row - len(lines))
+        lines = lines[:bottom_row]
         if lines:
-            lines[-1] = t.dim(s.status())
-        lines += [self.input_line()] + menu
+            lines[-1] = t.dim(status)
+        lines += [bottom] + menu
 
         out = [t.home]
         for y, line in enumerate(lines[:t.height]):
             out.append(t.move_xy(0, y) + t.truncate(line, t.width) + t.normal + t.clear_eol)
-        if self.menu.focused:
+        if cursor is None:
             out.append(t.hide_cursor)
         else:
-            # The cursor goes where you're typing.
-            x = min(t.length(PROMPT + self.text[:self.cursor]), t.width - 1)
-            out.append(t.normal_cursor + t.move_xy(x, input_row))
+            out.append(t.normal_cursor + t.move_xy(min(cursor, t.width - 1), bottom_row))
         return ''.join(out)
 
     def input_line(self) -> str:
@@ -115,12 +130,16 @@ class BlessedStrokeApp:
         if size != self.last_size:
             print(self.term.clear, end='')
             self.last_size, self.last_frame = size, ''
-        # Show as many characters as fit the width (which depends on the rendering mode too).
-        self.session.set_n_chars(self.session.fit_chars(self.term.width))
+        self.fit()
         frame = self.frame()
         if frame != self.last_frame:
             print(frame, end='', flush=True)
             self.last_frame = frame
+
+    def fit(self):
+        '''Size what's shown to the window, before each frame.'''
+        # Show as many characters as fit the width (which depends on the rendering mode too).
+        self.session.set_n_chars(self.session.fit_chars(self.term.width))
 
     def run(self):
         t = self.term

@@ -1,1 +1,1 @@
-uv run python -m src.main
+uv run python -m src.test -s resources/vocab/quiz_1.txt

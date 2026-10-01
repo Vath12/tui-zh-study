@@ -178,14 +178,21 @@ class HSKDictionary:
         from the HSK word it's part of (谢谢 -> xiè, xie), or else its own
         readings (好 -> hǎo, hào), with 一 and 不 changing tone to fit the
         next syllable (一个 -> yí gè). Characters with no pinyin get []."""
+        return cls.words_pinyin(cls.segment(text))
+
+    @classmethod
+    def words_pinyin(cls, words: list[str]) -> list[tuple[str, list[str]]]:
+        """Like text_pinyin, for text that's already split into words. A word
+        that isn't in HSK (a name like 玛丽) gets each character's own readings."""
         result, alone = [], []  # alone[i]: result[i] isn't part of a word
-        for word in cls.segment(text):
-            if len(word) > 1:
-                result += [(c, [s]) for c, s in zip(word, cls.word_syllables(word))]
+        for word in words:
+            syllables = cls.word_syllables(word) if len(word) > 1 else None
+            if syllables:
+                result += [(c, [s]) for c, s in zip(word, syllables)]
                 alone += [False] * len(word)
             else:
-                result.append((word, cls.readings(word)))
-                alone.append(True)
+                result += [(c, cls.readings(c)) for c in word]
+                alone += [True] * len(word)
         # Words already have 一 and 不 in the right tone (一点儿 yìdiǎnr), so
         # only change the ones standing alone, from the next syllable.
         for i, (char, readings) in enumerate(result):
