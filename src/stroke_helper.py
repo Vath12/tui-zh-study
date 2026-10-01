@@ -64,9 +64,9 @@ class StrokeApp:
         self.typed : list[tuple[str, list[str]]] = []
         self.message = ''
 
-        self.n_chars = 2
+        self.n_chars = 4
         self.blend_mode = 'majority'
-        self.rendering_mode = 'dots'
+        self.rendering_mode = 'octants'
         self.color_mode = 'multicolor'
 
         self.commands = {
