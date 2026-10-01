@@ -82,6 +82,76 @@ def draw_zi(canvas : TerminalCanvas, zi : Zi, colored : bool = True,
     return canvas
 
 
+def stroke_progress(d : str, median : list, width : int, height : int) -> np.ndarray:
+    '''For each pixel inside a stroke, how far along the stroke it is, from 0
+    at the start of the brush movement to 1 at the end (NaN outside the
+    stroke). Found by projecting each pixel onto the nearest segment of the
+    stroke's median, so revealing pixels up to t draws the stroke like a brush.'''
+    mask = stroke_mask(d, width, height)
+    progress = np.full((height, width), np.nan)
+    ys, xs = np.nonzero(mask)
+    if not len(xs):
+        return progress
+    points = np.stack([(xs + 0.5) * BOX / width, TOP - (ys + 0.5) * BOX / height], axis=-1)
+    m = np.array(median, dtype=float)
+    if len(m) < 2:
+        progress[mask] = 0
+        return progress
+    a, v = m[:-1], m[1:] - m[:-1]                 # segment starts and directions
+    lengths = np.hypot(*v.T)
+    before = np.concatenate([[0], np.cumsum(lengths)[:-1]])
+    # Position along each segment (0-1) of each pixel's closest point on it.
+    u = ((points[:, None] - a) * v).sum(-1) / np.maximum(lengths ** 2, 1e-9)
+    u = u.clip(0, 1)
+    dist = np.hypot(*(points[:, None] - (a + u[..., None] * v)).transpose(2, 0, 1))
+    nearest = dist.argmin(axis=1)
+    along = before[nearest] + u[np.arange(len(u)), nearest] * lengths[nearest]
+    progress[ys, xs] = along / max(lengths.sum(), 1e-9)
+    return progress
+
+
+class ZiAnimation:
+    '''Animates a character being written onto a canvas, one stroke at a time.
+
+    Every frame, draw(elapsed) redraws the canvas for `elapsed` seconds into
+    the animation: the whole character faintly in `ghost`, the finished strokes,
+    and the current stroke up to how far the brush has got. Each stroke takes
+    `stroke_time` seconds, with `pause` between strokes; after the last one the
+    finished character stays up for `hold` seconds, then it starts over.'''
+
+    def __init__(self, zi : Zi, canvas : TerminalCanvas, colored : bool = True, color : tuple[int, ...] = WHITE,
+                 stroke_time : float = 0.5, pause : float = 0.15, hold : float = 1.5,
+                 ghost : tuple[int, ...] | None = (70, 70, 70, 255)):
+        self.zi = zi
+        self.canvas = canvas
+        self.colors = stroke_colors(zi.n_strokes) if colored else [color] * zi.n_strokes
+        self.stroke_time, self.pause, self.hold = stroke_time, pause, hold
+        self.ghost = ghost
+        self.progress = [stroke_progress(d, m, canvas.width, canvas.height) for d, m in zip(zi.strokes, zi.medians)]
+        self.duration = zi.n_strokes * (stroke_time + pause) + hold
+
+    def stroke_at(self, elapsed : float) -> int:
+        '''Index of the stroke being drawn at `elapsed` (n_strokes once it's all drawn).'''
+        return min(int((elapsed % self.duration) // (self.stroke_time + self.pause)), self.zi.n_strokes)
+
+    def draw(self, elapsed : float):
+        t = elapsed % self.duration
+        pixels = self.canvas.pixels
+        pixels[:] = 0
+        if self.ghost:
+            for p in self.progress:
+                pixels[~np.isnan(p), :len(self.ghost)] = self.ghost
+        for i, (p, c) in enumerate(zip(self.progress, self.colors)):
+            done = (t - i * (self.stroke_time + self.pause)) / self.stroke_time
+            if done <= 0:
+                break
+            shown = p <= min(done, 1)          # NaN (outside the stroke) compares False
+            pixels[shown, :len(c)] = c
+            if len(c) == 3:
+                pixels[shown, 3] = 255
+        self.canvas.dirty = True
+
+
 def render_zi(zi : Zi | str, size : int = 80, colored : bool = True, color : tuple[int, ...] = WHITE,
               glyphs : str = 'braille', **canvas_options) -> str:
     '''A character as terminal text, `size` x `size` pixels. `zi` can be a Zi
