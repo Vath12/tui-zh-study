@@ -8,6 +8,11 @@ dependencies = [
     "blessed>=1.50.0",
     "numpy>=2.5.3",
     "prompt-toolkit>=3.0.53",
+
+    "mlx-lm",
+    "pydantic",
+    "psutil",
+    "requests",
 ]
 
 [project.scripts]
