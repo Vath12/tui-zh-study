@@ -80,14 +80,15 @@ def has_strokes(char : str) -> bool:
 
 class CharacterStrip(Widget):
     '''Characters side by side, each writing itself stroke by stroke, with its
-    pinyin underneath. They're as big as fits (up to MAX_SIZE pixels) and
-    centered in the area.
+    pinyin underneath. They're as big as fits (up to max_size pixels, or
+    without limit if it's None) and centered in the area.
 
     show() sets the characters; one that's already there keeps its animation
     and where it's got to. pinyin can be a bool or a function returning one.
     pinyin_styles, if set, styles each character's pinyin (e.g. green/red).'''
 
-    def __init__(self, look : StrokeLook, pinyin : bool | Callable[[], bool] = True, max_size : int = MAX_SIZE, **kwargs):
+    def __init__(self, look : StrokeLook, pinyin : bool | Callable[[], bool] = True, max_size : int | None = MAX_SIZE,
+                 **kwargs):
         kwargs.setdefault('height', FILL)
         super().__init__(**kwargs)
         self.look = look
@@ -135,7 +136,9 @@ class CharacterStrip(Widget):
         g = GLYPHS[self.look.glyphs]
         cols = (width - GAP * (n - 1)) // n
         rows = height - (1 if self.show_pinyin else 0)
-        size = min(self.max_size, cols * g.width, rows * g.height)
+        size = min(cols * g.width, rows * g.height)
+        if self.max_size is not None:
+            size = min(size, self.max_size)
         return max(MIN_SIZE, size - size % 4)
 
     def _prepare(self, slot : Slot, size : int):

@@ -36,8 +36,8 @@ class App:
         self.fps = fps
         self.term : Terminal | None = None
         self.screens : list[Screen] = []
-        self.commands = Commands()
-        self.settings = Settings(self.commands)
+        self.settings = Settings()
+        self.commands = Commands(menu=self.settings.menu_items)
         self.message : Rich = ''
         self.errors : list[str] = []   # tracebacks of errors caught in handlers and tasks
         self.global_bindings : dict[str, Callable] = {'ctrl+c': self.quit, 'ctrl+d': self.quit}
@@ -46,10 +46,10 @@ class App:
         self._wake : asyncio.Event | None = None
         self._tasks : set[asyncio.Task] = set()
 
-        self.commands.add('help', lambda args: self.commands.help(), 'list commands')
-        self.commands.add('error', lambda args: self.errors[-1].strip().splitlines()[-1] if self.errors else 'no errors',
+        self.commands.add('help', lambda rest: self.commands.help(), 'list commands')
+        self.commands.add('error', lambda rest: self.errors[-1].strip().splitlines()[-1] if self.errors else 'no errors',
                           'the last error')
-        self.settings.add(Action('quit', 'Quit', self.quit, 'exit'))
+        self.settings.add(Action('quit', 'Quit', self.quit, 'exit', last=True))
 
     # Screens
 

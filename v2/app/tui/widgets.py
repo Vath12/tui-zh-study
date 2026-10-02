@@ -204,31 +204,96 @@ class Input(Widget):
 class SettingsPanel(Widget):
     '''The settings menu: one row per Setting (its options, the current one
     highlighted) or Action, and a line of key hints. Up/down picks a row,
-    left/right changes its value straight away, Enter or Space steps a
-    setting or runs an action; Tab or Esc calls on_close. `hints` is the
-    line of key hints under the rows (None for none).'''
+    left/right changes a setting, Enter or Space steps a setting or runs an
+    action, and an action's `extra` rows run on their keys (rename on 'r',
+    delete on Delete, ...). An action with `children` and no `run` opens its
+    page: the rows are then its children, with a Back row, and its `hints`
+    replace the panel's. Esc goes back a page, or calls on_close at the top;
+    Tab always calls on_close.
+
+    `settings` is where the top level comes from: a Settings (its
+    menu_items()), or a function returning the rows. `hints` can be a
+    function too, or None for no hints at the top.'''
 
     focusable = True
     HINTS = '  ↑↓ choose  ←→ change  Enter select  Tab/Esc close'
+    BACK = Action('back', '‹ Back')
 
-    def __init__(self, settings : Settings, on_message : Callable[[str | None], None] = lambda m: None,
-                 on_close : Callable[[], None] = lambda: None, hints : str | None = HINTS, **kwargs):
+    def __init__(self, settings : 'Settings | Callable[[], list[Setting | Action]] | None',
+                 on_message : Callable[[str | None], None] = lambda m: None,
+                 on_close : Callable[[], None] = lambda: None, hints : Dynamic | None = HINTS, **kwargs):
         super().__init__(**kwargs)
         self.settings = settings
         self.hints = hints
         self.on_message = on_message
         self.on_close = on_close
         self.selected = 0
+        self.path : list[Action] = []        # the pages open, from the top
+        self._came_from : list[int] = []     # the row selected on each page before it
+
+    # Pages
+
+    @property
+    def page(self) -> Action | None:
+        return self.path[-1] if self.path else None
+
+    @property
+    def title(self) -> str | None:
+        return self.page.label if self.page else None
+
+    def open(self, path : list[Action] = ()):
+        '''Show this page (the Actions to it from the top; empty for the top).'''
+        self.path, self._came_from, self.selected = list(path), [0] * len(path), 0
+        self.invalidate()
+
+    def back(self) -> bool:
+        '''Up a page; False if already at the top.'''
+        if not self.path:
+            return False
+        self.path.pop()
+        self.selected = self._came_from.pop()
+        self.invalidate()
+        return True
 
     @property
     def items(self) -> list[Setting | Action]:
-        return self.settings.menu_items()
+        if self.page:
+            return [*self.page.children(), self.BACK]
+        if self.settings is None:
+            return []
+        return self.settings() if callable(self.settings) else self.settings.menu_items()
+
+    def hint_lines(self) -> list:
+        hints = _get(self.page.hints if self.page else self.hints)
+        return split_lines(hints) if hints else []
+
+    # Size
 
     def measure(self, width : int) -> int:
-        return len(self.items) + (1 if self.hints else 0)
+        return len(self.items) + len(self.hint_lines())
 
     def measure_width(self) -> int:
-        return 2 + max((len(i.label) for i in self.items), default=0)
+        items = self.items
+        label = max((len(i.label) for i in items), default=0)
+        detail = max((rich_width(d) for i in items if isinstance(i, Action) and (d := i.get_detail())), default=0)
+        options = max((sum(len(o) + 3 for o in i.choices()) for i in items if isinstance(i, Setting)), default=0)
+        hints = max((rich_width(line) for line in self.hint_lines()), default=0)
+        return max(5 + label + max(detail, options), hints)
+
+    # Keys
+
+    def select(self, item : Setting | Action):
+        '''Enter on a row.'''
+        if isinstance(item, Setting):
+            self.on_message(item.step(1))
+        elif item is self.BACK:
+            self.back()
+        elif item.run:
+            self.on_message(item.run())
+        elif item.children:
+            self._came_from.append(self.selected)
+            self.path.append(item)
+            self.selected = 0
 
     def handle_key(self, key : Key) -> bool:
         items = self.items
@@ -237,6 +302,7 @@ class SettingsPanel(Widget):
         self.selected %= len(items)
         item = items[self.selected]
         name = key.name
+        extra = next((e for e in item.extra if name in e.keys), None) if isinstance(item, Action) else None
         if name == 'up':
             self.selected = (self.selected - 1) % len(items)
         elif name == 'down':
@@ -244,7 +310,11 @@ class SettingsPanel(Widget):
         elif name in ('left', 'right') and isinstance(item, Setting):
             self.on_message(item.step(-1 if name == 'left' else 1))
         elif name in ('enter', 'space'):
-            self.on_message(item.step(1) if isinstance(item, Setting) else item.run())
+            self.select(item)
+        elif extra is not None:
+            self.on_message(extra.run())
+        elif name == 'escape' and self.back():
+            pass
         elif name in ('tab', 'escape'):
             self.on_close()
         else:
@@ -252,14 +322,18 @@ class SettingsPanel(Widget):
         self.invalidate()
         return True
 
+    # Drawing
+
     def draw(self, region : Region):
         items = self.items
         width = max((len(i.label) for i in items), default=0)
         focused = self.screen is not None and self.screen.focused is self
         for y, item in enumerate(items):
             here = focused and y == self.selected % len(items)
-            label = f'{"›" if here else " "} {item.label:<{width}}  '
-            line = [(label, BOLD if here else DIM)]
+            active = isinstance(item, Action) and item.is_active()
+            label = f'{"›" if here else " "} {item.label:<{width}} {"•" if active else " "} '
+            style = fg(CYAN, bold=True) if active else BOLD if here else DIM
+            line = [(label, style)]
             if isinstance(item, Setting):
                 current = item.get()
                 for option in item.choices():
@@ -268,15 +342,16 @@ class SettingsPanel(Widget):
                     else:
                         line.append((f' {option} ', PLAIN if here else DIM))
                     line.append(' ')
+            elif detail := item.get_detail():
+                line += [(t, s.over(DIM if not here else PLAIN)) for t, s in spans(detail)]
             region.put(0, y, line)
-        if self.hints:
-            region.put(0, len(items), self.hints, DIM)
+        region.put_lines(0, len(items), self.hint_lines(), DIM)
 
 
 class CommandInput(Input):
     '''An Input that's also the app's command line. Text starting with / is
-    a command: while you type it the status shows the commands it could be
-    (or the command's help, once it's typed in full), and Enter runs it.
+    a command (see Commands: the menu's rows, by name): while you type it the
+    status shows what it could be or go on to, and Enter runs it.
     Anything else goes to on_text(text) as it changes and on_enter(text) on
     Enter (return False from on_enter to keep the text).'''
 
@@ -290,15 +365,7 @@ class CommandInput(Input):
         app = self.app
         if text.startswith('/'):
             if app:
-                name, _, rest = text[1:].partition(' ')
-                matches = app.commands.matching(name)
-                exact = next((c for c in matches if c.name == name), None)
-                if exact and (rest or len(matches) == 1):
-                    app.notify(f'/{exact.name}: {exact.help}')
-                elif matches:
-                    app.notify('  '.join(f'/{c.name}' for c in matches))
-                else:
-                    app.notify(f'unknown command /{name}')
+                app.notify(app.commands.hint(text))
         elif self.on_text:
             self.on_text(text)
 

@@ -53,11 +53,11 @@ class CharWeights:
             self.right[c] = self.right.get(c, 0) + 1
 
 
-def make_question(pool : list[str], rng : random.Random, weights : CharWeights) -> list[str]:
-    '''A question: a few whole words from the pool, 1 to MAX_CHARS characters
-    in all, picked by their weights, without repeating a word if there's
-    anything else that fits.'''
-    target = rng.randint(1, MAX_CHARS)
+def make_question(pool : list[str], rng : random.Random, weights : CharWeights, max_chars : int = MAX_CHARS) -> list[str]:
+    '''A question: a few whole words from the pool, 1 to max_chars characters
+    in all, picked by their weights (anything with a word(w) method), without
+    repeating a word if there's anything else that fits.'''
+    target = rng.randint(1, max_chars)
     words = []
     while (room := target - sum(map(len, words))) > 0:
         fits = [w for w in pool if len(w) <= room]

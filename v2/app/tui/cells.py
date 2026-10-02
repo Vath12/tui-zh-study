@@ -12,7 +12,7 @@ Cell = tuple[str, Style]
 WIDE = ''
 BLANK : Cell = (' ', PLAIN)
 
-# Rich text: a str, or a sequence of spans, each a str or (str, Style).
+# Rich text: a str, one (str, Style) span, or a sequence of spans, each a str or (str, Style).
 Span = str | tuple[str, Style]
 Rich = str | Iterable[Span]
 
@@ -32,6 +32,8 @@ def spans(rich : Rich, style : Style = PLAIN) -> list[tuple[str, Style]]:
     '''Rich text as (text, style) spans, each style drawn over `style`.'''
     if isinstance(rich, str):
         return [(rich, style)]
+    if isinstance(rich, tuple) and len(rich) == 2 and isinstance(rich[1], Style):
+        rich = [rich]   # one span on its own
     out = []
     for span in rich:
         if isinstance(span, str):

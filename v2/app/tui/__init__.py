@@ -8,7 +8,7 @@
 '''
 from .app import App
 from .cells import Buffer, Region, Rich, parse_ansi, text_width
-from .commands import Action, Command, Commands, Setting, Settings
+from .commands import Action, Command, Commands, Message, Setting, Settings
 from .keys import Key
 from .render import Renderer
 from .style import (BLACK, BLUE, BOLD, CYAN, DIM, GRAY, GREEN, MAGENTA, PLAIN, RED, REVERSE, UNDERLINE,
