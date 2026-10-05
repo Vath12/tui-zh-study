@@ -353,13 +353,23 @@ class CommandInput(Input):
     a command (see Commands: the menu's rows, by name): while you type it the
     status shows what it could be or go on to, and Enter runs it.
     Anything else goes to on_text(text) as it changes and on_enter(text) on
-    Enter (return False from on_enter to keep the text).'''
+    Enter (return False from on_enter to keep the text). While the line is
+    empty, keys go to on_key(key) first (single-key controls); if it returns
+    True the line doesn't get them.'''
 
     def __init__(self, on_text : Callable[[str], None] | None = None,
-                 on_enter : Callable[[str], bool | None] | None = None, **kwargs):
+                 on_enter : Callable[[str], bool | None] | None = None,
+                 on_key : Callable[[Key], bool] | None = None, **kwargs):
         super().__init__(on_change=self._changed, on_submit=self._submitted, **kwargs)
         self.on_text = on_text
         self.on_enter = on_enter
+        self.on_key = on_key
+
+    def handle_key(self, key : Key) -> bool:
+        if not self.text and self.on_key and self.on_key(key):
+            self.invalidate()
+            return True
+        return super().handle_key(key)
 
     def _changed(self, text : str):
         app = self.app

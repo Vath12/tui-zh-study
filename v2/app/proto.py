@@ -2,9 +2,9 @@
 bottom. Tab pops a menu out on the left:
 
   Identify, Writing, Translation, Pinyin, Mixture
-             the study modes (see modes/; the current one is marked). Only
-             Identify works so far; the others say they aren't ready and
-             just log what you type.
+             the study modes (see modes/; the current one is marked).
+             Translation and Mixture aren't ready yet: they say so and just
+             log what you type.
   Session    your sessions (see sessions.Sessions, saved in .data/): each one
              keeps the program's state (the mode, the options, what's in the
              output), so switching session switches all of that. None is a
@@ -77,12 +77,13 @@ class ProtoScreen(Screen):
         self.look = StrokeLook()
         self.options = [self.remembered(s) for s in self.look.settings()]
         ctx = StudyContext(session=lambda: self.sessions.current, wordlists=self.wordlists, look=self.look,
-                           notify=lambda message: self.app.notify(message) if self.app else None)
+                           notify=self.notify)
         self.modes : dict[str, StudyMode] = {cls.name: cls(ctx) for cls in MODES}
         self.load_session()
 
         self.menu = SettingsPanel(None, hints=None, on_close=self.focus_input)
-        self.input = CommandInput(on_enter=self.entered, hint='Tab: menu', visible=lambda: self.focused is not self.asker)
+        self.input = CommandInput(on_enter=self.entered, on_key=lambda key: self.study.handle_key(key), hint='Tab: menu',
+                                  visible=lambda: self.focused is not self.asker)
         # For questions (a new name, a confirmation): see ask().
         self.asker = Input(prompt='? ', visible=lambda: self.focused is self.asker,
                            bindings={'escape': self.cancel_ask, 'tab': self.cancel_ask})
@@ -141,6 +142,13 @@ class ProtoScreen(Screen):
 
     def on_exit(self):
         self.app.commands.on_open = None
+
+    def notify(self, message):
+        '''A message for the status line; ignored while the screen is still
+        being built (the session's mode starts before there's an app).'''
+        app = getattr(self, '_app', None)
+        if app is not None:
+            app.notify(message)
 
     # Session state
 

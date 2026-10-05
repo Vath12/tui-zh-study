@@ -3,7 +3,7 @@ from typing import Callable
 
 from ..sessions import Session
 from ..strokes import StrokeLook
-from ..tui import DIM, Message, Text, Widget
+from ..tui import DIM, Key, Message, Text, Widget
 from ..wordlists import Wordlists
 
 
@@ -60,4 +60,9 @@ class StudyMode:
     def entered(self, text : str) -> bool:
         '''Enter on the command line (with anything but a /command). Return
         True if the mode used it.'''
+        return False
+
+    def handle_key(self, key : Key) -> bool:
+        '''A key pressed while the command line is empty, before it gets it
+        (for single-key controls). Return True if the mode used it.'''
         return False
