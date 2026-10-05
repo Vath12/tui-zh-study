@@ -1,25 +1,20 @@
-'''Try the text to speech: speak some Chinese, check the audio is sound,
-save it, and play it.
+'''Try the text to speech: type a line, hear it, and see whether the audio
+is sound (not silent or clipped, and a length that fits the text) and
+whether it came from the cache. Ctrl-C to stop.
 
-    uv run python -m v2.tts.test                         # the sentences below
-    uv run python -m v2.tts.test 你好 谢谢               # your own, one per argument
-    uv run python -m v2.tts.test --model custom-1.7b --voice Serena --no-play
+    uv run python -m v2.tts.test
+    uv run python -m v2.tts.test --model custom-1.7b --voice serena --no-play
 
-The first run downloads the model (see utils.MODELS). Exits 1 if any audio
-comes out silent, clipped, or a length that doesn't fit the text.'''
+The first run downloads the model (see tts.MODELS).'''
 import argparse
 import sys
-import random
-from pathlib import Path
 
 import numpy as np
 
-from .utils import DEFAULT_MODEL, DEFAULT_VOICE, MODELS, TTS, Speech
+from .tts import DEFAULT_MODEL, DEFAULT_VOICE, MODELS, TTS
+from .utils import Speech
 
-OUT_DIR = Path(__file__).parent.parent.parent / '.data' / 'tts'
-SENTENCES = ['你好。', '我是你的老师。', '谢谢，再见！']
-SECONDS_PER_CHAR = (0.1, 1.5)   # a plausible range of speech per character
-
+SECONDS_PER_CHAR = (0.1, 1.5)
 
 def problems(speech : Speech, text : str) -> list[str]:
     '''What's wrong with the audio for `text`, if anything.'''
@@ -41,7 +36,6 @@ def problems(speech : Speech, text : str) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='Try the Qwen3-TTS text to speech.')
-    parser.add_argument('texts', nargs='*', default=SENTENCES, help='what to say (default: a few short sentences)')
     parser.add_argument('--model', default=DEFAULT_MODEL, help=f'one of {", ".join(MODELS)}, or a Hugging Face repo')
     parser.add_argument('--voice', default=DEFAULT_VOICE, help='speaker, for CustomVoice models')
     parser.add_argument('--instruct', default=None, help='style ("speak slowly"), or the voice for VoiceDesign')
@@ -50,19 +44,28 @@ def main() -> int:
 
     tts = TTS(args.model, voice=args.voice)
     print(f'loading {tts.repo} (downloads it the first time)...', flush=True)
-    #print(f'model type {tts.kind}; speakers: {", ".join(tts.speakers()) or "-"}')
 
-    failed = False
-    for i, text in enumerate(args.texts):
-        speech = tts.say(text, instruct=args.instruct)
-        path = speech.save(OUT_DIR / f'test_{i}.wav')
-        found = problems(speech, text)
-        failed |= bool(found)
-        print(f'{"FAIL" if found else "ok  "} {text}  {speech.duration:.1f}s of audio in {speech.seconds_to_make:.1f}s '
-              f'(x{speech.real_time_factor:.2f} real time) -> {path}' + (f'  {"; ".join(found)}' if found else ''))
-        if not args.no_play:
-            speech.play()
-    return 1 if failed else 0
+    try:
+        while True:
+            text = input()
+            if not text.strip():
+                continue
+            if args.no_play:
+                speech = tts.say(text, instruct=args.instruct)
+            else:
+                speech = tts.speak(text, instruct=args.instruct)
+            found = problems(speech, text)
+            made = 'from the cache' if speech.cached else \
+                f'in {speech.seconds_to_make:.1f}s (x{speech.real_time_factor:.2f} real time)'
+            print(f'{"FAIL" if found else "ok  "} {text}  {speech.duration:.1f}s of audio {made}'
+                  f'   cache: {len(tts.cache)} clips' + (f'  {"; ".join(found)}' if found else ''))
+    except KeyboardInterrupt:
+        return 0
+    except Exception as e:
+        print(e)
+        return 1
+    
+    return 0
 
 
 if __name__ == '__main__':

@@ -1,2 +1,3 @@
-'''Text to speech: see utils.TTS.'''
-from .utils import DEFAULT_MODEL, DEFAULT_VOICE, MODELS, TTS, Speech
+'''Text to speech: see tts.TTS, and utils for the audio (Speech, Player, AudioCache).'''
+from .tts import DEFAULT_MODEL, DEFAULT_VOICE, MODELS, TTS
+from .utils import AudioCache, Player, Speech
