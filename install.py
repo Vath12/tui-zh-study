@@ -207,7 +207,7 @@ SOURCES = {
                      'cedict_1_0_ts_utf-8_mdbg.zip', member='cedict_ts.u8', check=has_cedict_entries,
                      parse=parse_cedict, output='cc-cedict.tsv'),
     # Make Me a Hanzi (Shaunak Kishore): stroke outlines and medians for each
-    # character, used to draw them (src/strokes). Copied as it is.
+    # character, used to draw them (v2/stroke). Copied as it is.
     'strokes': Source('https://raw.githubusercontent.com/skishore/makemeahanzi/master/graphics.txt',
                       'makemeahanzi_graphics.txt', check=has_stroke_data, output='strokes/graphics.txt'),
 }

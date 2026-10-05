@@ -3,7 +3,7 @@ numbers (wo3, ni3hao3, ni3 hao3) or a mix, and checking it against the
 right readings.'''
 import re
 
-from src.vocabulary.pinyin import TONELESS, split_pinyin, tone
+from v2.vocabulary.pinyin import TONELESS, split_pinyin, tone
 
 # A syllable as (letters without tone marks, tone 1-5), 5 being the neutral tone.
 Syllable = tuple[str, int]

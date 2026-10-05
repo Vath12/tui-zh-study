@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from src.vocabulary.vocab import VOCAB_DIR
+from v2.vocabulary.vocab import VOCAB_DIR
 
 from .quiz.screen import MODES, QuizScreen
 from .strokes import StrokeLook

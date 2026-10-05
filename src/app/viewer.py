@@ -1,4 +1,4 @@
-from src.vocabulary.hsk import HSKDictionary
+from v2.vocabulary.hsk import HSKDictionary
 
 from .strokes import CharacterStrip, StrokeLook, has_strokes
 from .tui import DIM, Column, CommandInput, Screen, Setting, Text

@@ -1,6 +1,6 @@
 import random
 
-from src.vocabulary.hsk import HSKDictionary
+from v2.vocabulary.hsk import HSKDictionary
 
 from ..quiz.questions import make_question
 from ..strokes import CharacterStrip, has_strokes
