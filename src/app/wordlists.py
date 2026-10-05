@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from v2.vocabulary.vocab import VOCAB_DIR
+from src.vocabulary.vocab import VOCAB_DIR
 
 ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = ROOT / '.data'

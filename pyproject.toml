@@ -13,6 +13,7 @@ dependencies = [
     "psutil",
     "requests",
     "mlx-audio>=0.5.7",
+    "polars"
 ]
 
 [project.scripts]

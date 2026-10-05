@@ -2,9 +2,9 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from v2.stroke.render import GLYPHS, RED, WHITE, TerminalCanvas
-from v2.stroke.stroke import HanziStroke
-from v2.stroke.stroke_render import ZiAnimation
+from src.stroke.render import GLYPHS, RED, WHITE, TerminalCanvas
+from src.stroke.stroke import HanziStroke
+from src.stroke.stroke_render import ZiAnimation
 
 from .tui import PLAIN, FILL, Region, Setting, Style, Widget
 

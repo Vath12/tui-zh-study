@@ -1,8 +1,8 @@
 import random
 from pathlib import Path
 
-from v2.vocabulary.hsk import HSKDictionary
-from v2.vocabulary.vocab import VOCAB_DIR
+from src.vocabulary.hsk import HSKDictionary
+from src.vocabulary.vocab import VOCAB_DIR
 
 from ..strokes import CharacterStrip, StrokeLook
 from ..tui import (BOLD, DIM, FILL, GREEN, RED, Align, Column, CommandInput, Key, Layers, Screen, Setting, Text,

@@ -3,13 +3,10 @@ numbers (wo3, ni3hao3, ni3 hao3) or a mix, and checking it against the
 right readings.'''
 import re
 
-from v2.vocabulary.pinyin import TONELESS, split_pinyin, tone
+from src.vocabulary.pinyin import TONELESS, mark_syllable, split_pinyin, tone
 
 # A syllable as (letters without tone marks, tone 1-5), 5 being the neutral tone.
 Syllable = tuple[str, int]
-
-_MARKS = {v: m for v, m in zip('aeiouü', ['āáǎà', 'ēéěè', 'īíǐì', 'ōóǒò', 'ūúǔù', 'ǖǘǚǜ'])}
-
 
 def syllable(marked : str) -> Syllable:
     '''A syllable written with a tone mark (or none) as (letters, tone): "hǎo" -> ("hao", 3).'''
@@ -17,16 +14,8 @@ def syllable(marked : str) -> Syllable:
 
 
 def marked(s : Syllable) -> str:
-    '''A syllable with its tone mark: ("hao", 3) -> "hǎo". The mark goes on
-    a or e if there is one, the o of ou, else the last vowel.'''
-    letters, t = s
-    if t == 5:
-        return letters
-    for i in ([letters.find('a'), letters.find('e')] if 'a' in letters or 'e' in letters
-              else [letters.find('o') if 'ou' in letters else max(letters.rfind(v) for v in 'iouü')]):
-        if i >= 0:
-            return letters[:i] + _MARKS[letters[i]][t - 1] + letters[i + 1:]
-    return letters
+    '''A syllable with its tone mark: ("hao", 3) -> "hǎo" (see pinyin.mark_syllable).'''
+    return mark_syllable(*s)
 
 
 def parse(typed : str) -> list[Syllable] | None:

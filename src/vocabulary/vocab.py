@@ -5,7 +5,6 @@ from .hsk import HSKDictionary, HSKEntry, pinyin_from_words
 
 VOCAB_DIR = Path(__file__).parent.parent.parent / "resources" / "vocab"
 
-
 @dataclass
 class VocabMatch:
     vocab: str

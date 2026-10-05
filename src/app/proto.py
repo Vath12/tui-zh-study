@@ -22,7 +22,7 @@ the menu away, and so does typing anything else, which goes to the command
 line. Every row is also a command, by its names: /writing, /session new,
 /session Notes rename, /vocabulary add PATH, /options speed 1s (see Commands).
 
-    uv run python -m v2.app.proto
+    uv run python -m src.app.proto
 '''
 import shlex
 from datetime import datetime

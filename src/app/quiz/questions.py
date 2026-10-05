@@ -1,9 +1,9 @@
 import random
 from pathlib import Path
 
-from v2.stroke.stroke import HanziStroke
-from v2.vocabulary.hsk import HSKDictionary
-from v2.vocabulary.vocab import VOCAB_DIR, load_vocab
+from src.stroke.stroke import HanziStroke
+from src.vocabulary.hsk import HSKDictionary
+from src.vocabulary.vocab import VOCAB_DIR, load_vocab
 
 MAX_CHARS = 4  # longest question, in characters
 BUILT_LEVELS = {'1', '2', '3'}  # HSK levels of the extra words built from your vocab

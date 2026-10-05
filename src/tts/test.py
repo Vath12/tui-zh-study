@@ -2,8 +2,8 @@
 is sound (not silent or clipped, and a length that fits the text) and
 whether it came from the cache. Ctrl-C to stop.
 
-    uv run python -m v2.tts.test
-    uv run python -m v2.tts.test --model custom-1.7b --voice serena --no-play
+    uv run python -m src.tts.test
+    uv run python -m src.tts.test --model custom-1.7b --voice serena --no-play
 
 The first run downloads the model (see tts.MODELS).'''
 import argparse

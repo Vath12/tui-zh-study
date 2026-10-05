@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from v2.vocabulary.vocab import VOCAB_DIR
+from src.vocabulary.vocab import VOCAB_DIR
 
 from .quiz.screen import MODES, QuizScreen
 from .strokes import StrokeLook
@@ -10,7 +10,7 @@ from .viewer import ViewerScreen
 
 
 def main():
-    parser = argparse.ArgumentParser(prog='python -m v2.app', description='Chinese character practice in the terminal.')
+    parser = argparse.ArgumentParser(prog='python -m src.app', description='Chinese character practice in the terminal.')
     parser.add_argument('mode', nargs='?', choices=['view', *MODES], default='read',
                         help='view: type characters and watch their strokes; '
                              + '; '.join(f'{m}: {d}' for m, d in MODES.items()))
