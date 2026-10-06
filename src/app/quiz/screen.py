@@ -5,9 +5,9 @@ from src.vocabulary.hsk import HSKDictionary
 from ..wordlists import VOCAB_DIR
 
 from ..strokes import CharacterStrip, StrokeLook
-from ..tui import (BOLD, DIM, FILL, GREEN, RED, Align, Column, CommandInput, Key, Layers, Screen, Setting, Text,
+from src.tui import (BOLD, DIM, FILL, GREEN, RED, Align, Column, CommandInput, Key, Layers, Screen, Setting, Text,
                    fg)
-from ..tui.screens import SettingsMenu
+from src.tui.screens import SettingsMenu
 from .questions import CharWeights, make_question, question_pool
 
 # mode name -> what you do in it

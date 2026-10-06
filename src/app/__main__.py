@@ -5,7 +5,7 @@ from .wordlists import VOCAB_DIR
 
 from .quiz.screen import MODES, QuizScreen
 from .strokes import StrokeLook
-from .tui import App
+from src.tui import App
 from .viewer import ViewerScreen
 
 

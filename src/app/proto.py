@@ -32,7 +32,7 @@ from typing import Callable
 from .modes import MODES, StudyContext, StudyMode
 from .sessions import Session, SessionError, Sessions
 from .strokes import CharacterStrip, StrokeLook
-from .tui import (BOLD, DIM, FILL, RED, YELLOW, Action, App, Column, CommandInput, Input, Key, Layers, Row, Rule,
+from src.tui import (BOLD, DIM, FILL, RED, YELLOW, Action, App, Column, CommandInput, Input, Key, Layers, Row, Rule,
                   Screen, Setting, SettingsPanel, Spacer, Text, fg)
 from .wordlists import InvalidWordlist, Wordlist, Wordlists
 

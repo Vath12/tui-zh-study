@@ -1,5 +1,5 @@
 from src.vocabulary.pinyin import check
-from ..tui import DIM, FILL, Column, Text, Widget
+from src.tui import DIM, FILL, Column, Text, Widget
 from .questions import QuestionMode
 
 

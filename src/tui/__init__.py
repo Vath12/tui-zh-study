@@ -5,6 +5,7 @@
   Widget    something on screen; Column, Row, Layers, Align, Pad lay them out
   Text, Ansi, Input, SettingsPanel, Spacer   stock widgets
   Buffer / Region / Renderer   cells drawn into, and written to the terminal as diffs
+  canvas.TerminalCanvas        an RGBA pixel buffer shown as text (braille / octant glyphs)
 '''
 from .app import App
 from .cells import Buffer, Region, Rich, parse_ansi, text_width

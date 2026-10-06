@@ -3,7 +3,7 @@ import re
 
 import numpy as np
 
-from .render import TerminalCanvas, WHITE
+from src.tui.canvas import TerminalCanvas, WHITE
 from .stroke import HanziStroke, Zi
 
 # Stroke data uses a 1024 x 1024 box with y pointing up; the top of the box is y=900.
@@ -173,5 +173,5 @@ if __name__ == '__main__':
     import sys
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     glyphs = next((a[len('--glyphs='):] for a in sys.argv[1:] if a.startswith('--glyphs=')), 'braille')
-    for char in ''.join(args) or '我':
-        print(render_zi(char, size=90, cell_color='majority', colored='--plain' not in sys.argv, glyphs=glyphs))
+    for char in ''.join(args) or '神罚':
+        print(render_zi(char, size=50, cell_color='majority', colored='--plain' not in sys.argv, glyphs=glyphs))

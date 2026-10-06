@@ -3,7 +3,7 @@ from typing import Callable
 
 from ..sessions import Session
 from ..strokes import StrokeLook
-from ..tui import DIM, Key, Message, Text, Widget
+from src.tui import DIM, Key, Message, Text, Widget
 from ..wordlists import Wordlists
 
 

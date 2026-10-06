@@ -1,4 +1,4 @@
-from ..tui import BOLD, DIM, FILL, GREEN, RED, Align, Column, Key, Layers, Text, Widget, fg
+from src.tui import BOLD, DIM, FILL, GREEN, RED, Align, Column, Key, Layers, Text, Widget, fg
 from .questions import QuestionMode
 
 

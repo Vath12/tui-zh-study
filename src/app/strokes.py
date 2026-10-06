@@ -2,11 +2,11 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from src.stroke.render import GLYPHS, RED, WHITE, TerminalCanvas
+from src.tui.canvas import GLYPHS, RED, WHITE, TerminalCanvas
 from src.stroke.stroke import HanziStroke
 from src.stroke.stroke_render import ZiAnimation
 
-from .tui import PLAIN, FILL, Region, Setting, Style, Widget
+from src.tui import PLAIN, FILL, Region, Setting, Style, Widget
 
 MAX_SIZE = 80   # canvas size in pixels, per character, when there's room
 MIN_SIZE = 8

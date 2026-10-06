@@ -1,8 +1,8 @@
 from src.vocabulary.hsk import HSKDictionary
 
 from .strokes import CharacterStrip, StrokeLook, has_strokes
-from .tui import DIM, Column, CommandInput, Screen, Setting, Text
-from .tui.screens import SettingsMenu
+from src.tui import DIM, Column, CommandInput, Screen, Setting, Text
+from src.tui.screens import SettingsMenu
 
 MAX_CHARS = 8
 PINYIN_MODES = ['show', 'hide']

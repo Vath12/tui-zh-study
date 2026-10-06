@@ -4,7 +4,7 @@ from src.vocabulary.hsk import HSKDictionary
 
 from ..quiz.questions import make_question
 from ..strokes import CharacterStrip, has_strokes
-from ..tui import DIM, GREEN, RED, fg
+from src.tui import DIM, GREEN, RED, fg
 from .base import StudyMode
 
 MAX_SHOWN = 6   # most characters in one question
