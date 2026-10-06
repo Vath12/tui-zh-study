@@ -23,8 +23,12 @@ class TestDictionary(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        Dictionary._l_load_dict()
-        Dictionary._l_load_char_frequency()
+        Dictionary.init()
+
+    def test_init_twice_keeps_the_data(self):
+        cedict = Dictionary.cedict
+        Dictionary.init()
+        self.assertIs(Dictionary.cedict, cedict)
 
     def test_charset_hash_column(self):
         row = Dictionary.cedict.filter(pl.col('simplified') == '你好')
@@ -66,6 +70,21 @@ class TestDictionary(unittest.TestCase):
 
     def test_most_common(self):
         self.assertEqual(Dictionary.most_common(3), ['的', '一', '是'])
+
+    def test_lookups_load_lazily(self):
+        cedict, frequency = Dictionary.cedict, Dictionary.frequency
+        try:
+            Dictionary.cedict = Dictionary.frequency = None
+            self.assertEqual(Dictionary.pinyin('你好'), ['ni3 hao3'])   # loads, with no init()
+            self.assertIsNotNone(Dictionary.cedict)
+            self.assertIsNotNone(Dictionary.frequency)
+        finally:
+            Dictionary.cedict, Dictionary.frequency = cedict, frequency
+
+    def test_every_lookup_is_loaded(self):
+        for name in ['lookup', 'pinyin', 'definitions', 'with_charset', 'made_of', 'char_frequency', 'most_common']:
+            with self.subTest(name):
+                self.assertTrue(hasattr(getattr(Dictionary, name).__func__, '__wrapped__'), f'{name} isn\'t @loaded')
 
 
 if __name__ == '__main__':

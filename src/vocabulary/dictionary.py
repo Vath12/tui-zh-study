@@ -1,3 +1,4 @@
+import functools
 import hashlib
 from pathlib import Path
 
@@ -26,8 +27,19 @@ def charset_hash(text : str) -> str:
     return hashlib.md5(charset_key(text).encode('utf-8')).hexdigest()
 
 
+def loaded(fn):
+    '''For Dictionary's methods: load the resources first (only the first
+    time; see Dictionary.init). Goes under @classmethod.'''
+    @functools.wraps(fn)
+    def run(cls, *args, **kwargs):
+        cls.init()
+        return fn(cls, *args, **kwargs)
+    return run
+
+
 class Dictionary():
-    '''CC-CEDICT and Jun Da's character frequency list, loaded on first use.
+    '''CC-CEDICT and Jun Da's character frequency list. They're loaded by
+    init(), or else by the first lookup (every lookup is @loaded).
 
       cedict     one row per entry: simplified, traditional, pinyin (tone
                  numbers, CEDICT style), definitions (split by /),
@@ -39,6 +51,13 @@ class Dictionary():
 
     cedict : pl.DataFrame | None = None
     frequency : pl.DataFrame | None = None
+
+    @classmethod
+    def init(cls):
+        '''Load the resources now, rather than on the first lookup (to
+        control when the wait is). Does nothing if they're already loaded.'''
+        cls._l_load_dict()
+        cls._l_load_char_frequency()
 
     @classmethod
     def _l_load_dict(cls):
@@ -75,12 +94,13 @@ class Dictionary():
     # Lookups
 
     @classmethod
+    @loaded
     def lookup(cls, word : str) -> pl.DataFrame:
         '''Every entry for a word (in simplified characters).'''
-        cls._l_load_dict()
         return cls.cedict.filter(pl.col('simplified') == word)
 
     @classmethod
+    @loaded
     def pinyin(cls, word : str, marked : bool = False) -> list[str]:
         '''The word's readings, in tone numbers (好 -> ['hao3', 'hao4']), or
         with marked, in tone marks (['hǎo', 'hào']).'''
@@ -88,22 +108,23 @@ class Dictionary():
         return cls.lookup(word)[column].unique(maintain_order=True).to_list()
 
     @classmethod
+    @loaded
     def definitions(cls, word : str) -> list[str]:
         '''Every definition of the word, from all its entries.'''
         return [d for defs in cls.lookup(word)['definitions'].to_list() for d in defs.split('/')]
 
     @classmethod
+    @loaded
     def with_charset(cls, chars : str) -> pl.DataFrame:
         '''Entries made of exactly these characters, in any order and any
         number of times (你好 finds 你好 and 好你, not 你 or 你们).'''
-        cls._l_load_dict()
         return cls.cedict.filter(pl.col('charset_hash') == charset_hash(chars))
 
     @classmethod
+    @loaded
     def made_of(cls, chars : str, max_len : int | None = None) -> pl.DataFrame:
         '''Entries made only of these characters (any of them, any order),
         e.g. the words you can read if you know chars.'''
-        cls._l_load_dict()
         known = list(set(chars))
         df = cls.cedict
         if max_len is not None:
@@ -111,17 +132,17 @@ class Dictionary():
         return df.filter(pl.col('simplified').str.split('').list.eval(pl.element().is_in(known)).list.all())
 
     @classmethod
+    @loaded
     def char_frequency(cls, char : str) -> dict | None:
         '''A character's row in the frequency list (rank, count, pinyin,
         english), or None if it isn't in it.'''
-        cls._l_load_char_frequency()
         rows = cls.frequency.filter(pl.col('char') == char).to_dicts()
         return rows[0] if rows else None
 
     @classmethod
+    @loaded
     def most_common(cls, n : int) -> list[str]:
         '''The n most common characters, most common first.'''
-        cls._l_load_char_frequency()
         return cls.frequency.head(n)['char'].to_list()
 
 
@@ -130,15 +151,17 @@ if __name__ == "__main__":
     import time
 
     t = time.perf_counter()
-    Dictionary._l_load_dict()
-    print(f'cedict: {Dictionary.cedict.height:,} entries in {time.perf_counter() - t:.2f}s')
-    t = time.perf_counter()
-    Dictionary._l_load_char_frequency()
-    print(f'frequency: {Dictionary.frequency.height:,} characters in {time.perf_counter() - t:.2f}s')
-    print(Dictionary.cedict.head(5))
-    print('好:', Dictionary.pinyin('好'), Dictionary.pinyin('好', marked=True), '| 你好:', Dictionary.definitions('你好'))
-    print('made of exactly 你 and 好:', Dictionary.with_charset('好你')['simplified'].unique().to_list())
-    vocab = '我你好他她是不很学中国人们的了吗'
-    readable = Dictionary.made_of(vocab, max_len=4)['simplified'].unique().sort().to_list()
-    print(f'words made only of {vocab}: {len(readable)}, e.g. {readable[:12]}')
-    print('的:', Dictionary.char_frequency('的'), '| 我 is #' + str(Dictionary.char_frequency('我')['rank']))
+    Dictionary.init()
+    print(f'loaded {Dictionary.cedict.height:,} entries and {Dictionary.frequency.height:,} characters '
+          f'in {time.perf_counter() - t:.2f}s')
+
+    for c in Dictionary.most_common(10):
+        pron = Dictionary.pinyin(c,True)
+        print(c,pron[0] + (f' +{len(pron)-1}' if len(pron)>1 else ''))
+
+    # Words made of the 200 most common characters, sorted by their characters in
+    # frequency order: the 的 words first, then 一, 是, ... (then by the 2nd character, and so on).
+    rank = {c: i for i, c in enumerate(Dictionary.frequency['char'])}
+    n_words = Dictionary.made_of(Dictionary.most_common(200))
+    for w in sorted(n_words.iter_rows(named=True), key=lambda w: [rank.get(c, len(rank)) for c in w['simplified']]):
+        print(w['simplified'],w['definitions'])
