@@ -1,5 +1,12 @@
+"""Pinyin: splitting it into syllables, tone marks and tone numbers, and
+reading what someone typed (wǒ, wo3, ni3 hao3, nǐhǎo) to check it."""
 import re
 import unicodedata
+
+# The tone marks: vowel -> its marks for tones 1-4.
+MARKS = {v: m for v, m in zip("aeiouü", ["āáǎà", "ēéěè", "īíǐì", "ōóǒò", "ūúǔù", "ǖǘǚǜ"])}
+TONE_MARKS = {m: t for marks in MARKS.values() for t, m in enumerate(marks, 1)}   # ǎ -> 3
+TONELESS = str.maketrans({m: v for v, marks in MARKS.items() for m in marks})   # ǎ -> a
 
 INITIALS = ["zh", "ch", "sh", *"bpmfdtnlgkhjqxrzcsyw"]
 FINALS = """a o e ai ei ao ou an en ang eng ong er i ia ie iao iu ian in iang ing
@@ -8,7 +15,6 @@ SYLLABLES = {i + f for i in INITIALS for f in FINALS}
 # Syllables with no initial. Mid-word these always follow an apostrophe (可爱 kě'ài),
 # so they're only allowed at the start of a chunk; otherwise 可能 kěnéng -> kěn|éng.
 BARE = set("a o e ai ei ao ou an en ang eng er".split())
-TONELESS = str.maketrans("āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ", "aaaaeeeeiiiioooouuuuüüüü")
 LONGEST = 6  # letters in the longest syllable (zhuang)
 
 
@@ -41,53 +47,15 @@ def _split_chunk(chunk: str) -> list[str] | None:
     return split(0)
 
 
-def has_tone(syllable: str) -> bool:
-    return syllable.translate(TONELESS) != syllable
-
-
-TONE_MARKS = {c: i % 4 + 1 for i, c in enumerate("āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ")}
-
-
 def tone(syllable: str) -> int:
-    """A syllable's tone, 1-4, or 5 for the neutral tone (no mark)."""
-    return next((TONE_MARKS[c] for c in syllable if c in TONE_MARKS), 5)
-
-
-def set_tone(syllable: str, new: int) -> str:
-    """The syllable with its tone mark changed to tone `new` (1-4)."""
-    for i, c in enumerate(syllable):
-        if c in TONE_MARKS:
-            base = "aaaaeeeeiiiioooouuuuüüüü"["āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ".index(c)]
-            marked = "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ"["aeiouü".index(base) * 4 + new - 1]
-            return syllable[:i] + marked + syllable[i + 1:]
-    return syllable
-
-
-NUMBERS = set("零一二三四五六七八九十百千万亿两第")
-
-
-def yi_bu_sandhi(char: str, syllable: str, next_syllable: str | None, prev_char: str | None = None) -> str:
-    """The tone changes of 一 and 不 that pinyin writes, from the syllable after:
-    不 bù -> bú before a 4th tone; 一 yī -> yí before a 4th tone and yì before
-    any other tone. At the end (no next syllable) they keep their own tone, and
-    so does 一 in ordinals and numbers (第一 dìyī, 十一 shíyī). This doesn't know
-    about dates and counting in general, where 一 also stays yī (一月 yīyuè)."""
-    if next_syllable is None or tone(next_syllable) == 5:
-        return syllable
-    if char == "一" and prev_char in NUMBERS:
-        return syllable
-    if char == "不" and syllable == "bù" and tone(next_syllable) == 4:
-        return "bú"
-    if char == "一" and syllable == "yī":
-        return set_tone(syllable, 2 if tone(next_syllable) == 4 else 4)
-    return syllable
+    """A syllable's tone, 1-4, or 5 for the neutral tone (no mark). Ǎi is 3 too."""
+    return next((TONE_MARKS[c] for c in syllable.lower() if c in TONE_MARKS), 5)
 
 
 # Tone numbers -> tone marks
 
-_MARKED = {v: m for v, m in zip("aeiouü", ["āáǎà", "ēéěè", "īíǐì", "ōóǒò", "ūúǔù", "ǖǘǚǜ"])}
 # Combining marks, for letters with no precomposed marked form (ê, and m n ng hm hng).
-_COMBINING = {1: "̄", 2: "́", 3: "̌", 4: "̀"}
+_COMBINING = {1: "\u0304", 2: "\u0301", 3: "\u030c", 4: "\u0300"}
 _VOWELS = "aeiouüê"
 
 
@@ -113,8 +81,8 @@ def mark_syllable(letters: str, tone: int) -> str:
     else:
         return letters  # not a syllable (erhua's r, letters like the D of 3D)
     c = letters[i]
-    if c.lower() in _MARKED:
-        marked = _MARKED[c.lower()][tone - 1]
+    if c.lower() in MARKS:
+        marked = MARKS[c.lower()][tone - 1]
         marked = marked.upper() if c.isupper() else marked
     else:
         marked = c + _COMBINING[tone]  # ê, m, n: a combining mark
@@ -146,3 +114,79 @@ def numbers_to_marks(pinyin: str, join: bool = True) -> str:
             syllable = "'" + syllable
         out.append(syllable)
     return ("" if join else " ").join(out)
+
+
+# What someone typed
+
+# A syllable as (letters without tone marks, tone 1-5), 5 being the neutral tone.
+Syllable = tuple[str, int]
+
+
+def syllable(marked: str) -> Syllable:
+    """A syllable written with a tone mark (or none) as (letters, tone): "hǎo" -> ("hao", 3)."""
+    return marked.lower().translate(TONELESS), tone(marked)
+
+
+def parse(typed: str) -> list[Syllable] | None:
+    """What someone typed, as syllables, or None if it isn't pinyin.
+
+    Tone marks or numbers (wǒ, wo3) or a mix; a number goes after its
+    syllable, and a syllable with no number or mark is the neutral tone
+    (xie4xie, or xie4xie5; 0 works for 5 too). v and u: are ü. Spaces and
+    apostrophes between syllables are optional."""
+    text = typed.strip().lower().replace("u:", "ü").replace("v", "ü")
+    text = re.sub(r"[\s'’-]+", "", text)
+    if not text:
+        return None
+    out = []
+    # Chunks of letters, each with the tone number after it if there is one.
+    for letters, digit in re.findall(r"([^\d]+)(\d?)", text):
+        if not re.fullmatch(r"[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü]+", letters):
+            return None
+        parts = _split_erhua(letters)
+        if parts is None:
+            return None
+        syllables = [syllable(p) for p in parts]
+        if digit:
+            t = 5 if digit == "0" else int(digit)
+            if not 1 <= t <= 5:
+                return None
+            # The number is the last syllable's tone, or the one before erhua's r (nar3).
+            i = -2 if len(syllables) > 1 and syllables[-1][0] == "r" else -1
+            syllables[i] = (syllables[i][0], t)
+        out += syllables
+    return out
+
+
+def _split_erhua(letters: str) -> list[str] | None:
+    """Letters as syllables, with erhua's r as a syllable of its own (the
+    儿 of 一点儿, yìdiǎnr or yi4dian3r) when that's the only way they split."""
+    if letters == "r":
+        return ["r"]
+    parts = split_pinyin(letters)
+    if parts is None and letters.endswith("r") and (rest := split_pinyin(letters[:-1])):
+        parts = [*rest, "r"]
+    return parts
+
+
+def check(typed: str, readings: list[list[str]]) -> list[tuple[str, bool]] | None:
+    """Check typed pinyin against the readings of each character (a list
+    per character of the tone-marked readings that count as right).
+    Returns, per character, (what was typed for it, in tone marks, '' if
+    nothing, and whether it's one of its readings), or None if what was
+    typed isn't pinyin."""
+    syllables = parse(typed)
+    if syllables is None:
+        return None
+    # Erhua again: zhèr reads as one syllable, but 这儿 wants zhè + r.
+    if len(syllables) == len(readings) - 1 and readings[-1] == ["r"] and syllables[-1][0].endswith("r"):
+        letters, t = syllables[-1]
+        syllables[-1:] = [(letters[:-1], t), ("r", 5)]
+    out = []
+    for i, options in enumerate(readings):
+        if i >= len(syllables):
+            out.append(("", False))
+            continue
+        guess = syllables[i]
+        out.append((mark_syllable(*guess), any(syllable(o) == guess for o in options)))
+    return out

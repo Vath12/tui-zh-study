@@ -4,10 +4,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.vocabulary.vocab import VOCAB_DIR
 
 ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = ROOT / '.data'
+VOCAB_DIR = ROOT / 'resources' / 'vocab'   # where wordlist .txt files usually live
 WORDLISTS_FILE = DATA_DIR / 'wordlists.json'
 
 _HAN = re.compile(r'[㐀-䶿一-鿿豈-﫿\U00020000-\U0003134F]+')
@@ -18,8 +18,8 @@ class InvalidWordlist(Exception):
 
 
 def read_wordlist(path : Path) -> list[str]:
-    '''The words in a wordlist file, read the way load_vocab does (the first
-    token of each line; # starts a comment). Raises InvalidWordlist if it
+    '''The words in a wordlist file: the first token of each line (# starts
+    a comment). Raises InvalidWordlist if it
     isn't a readable UTF-8 .txt file with at least one word, all of them
     Chinese characters.'''
     path = Path(path)
@@ -46,6 +46,14 @@ def read_wordlist(path : Path) -> list[str]:
     if not words:
         raise InvalidWordlist(f'no words in {path.name}')
     return list(dict.fromkeys(words))
+
+
+def words_in(source : Path = VOCAB_DIR) -> list[str]:
+    '''The words in a wordlist file, or in every .txt wordlist in a
+    directory, without repeats. Raises InvalidWordlist for a bad file.'''
+    source = Path(source)
+    paths = [source] if source.is_file() else sorted(source.glob('*.txt'))
+    return list(dict.fromkeys(w for path in paths for w in read_wordlist(path)))
 
 
 @dataclass

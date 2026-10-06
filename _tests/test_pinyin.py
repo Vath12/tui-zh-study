@@ -1,8 +1,7 @@
 import unittest
 import unicodedata
 
-from src.app.pinyin_answers import check, parse
-from src.vocabulary.pinyin import mark_syllable, numbers_to_marks
+from src.vocabulary.pinyin import check, mark_syllable, numbers_to_marks, parse
 
 
 class TestNumbersToMarks(unittest.TestCase):
@@ -38,12 +37,17 @@ class TestNumbersToMarks(unittest.TestCase):
         self.assertEqual(len(numbers_to_marks('m2')), 1)          # ḿ is one character
         self.assertEqual(numbers_to_marks('m3'), 'm̌')        # m̌ has no single character
 
+    def test_tone_of_a_capital(self):
+        from src.vocabulary.pinyin import syllable, tone
+        self.assertEqual(tone('Ǎi'), 3)
+        self.assertEqual(syllable('Ān'), ('an', 1))
+
     def test_mark_syllable_neutral(self):
         self.assertEqual(mark_syllable('xie', 5), 'xie')
 
 
 class TestAnswers(unittest.TestCase):
-    '''What someone types in the Pinyin mode (src/app/pinyin_answers).'''
+    '''What someone types in the Pinyin mode (pinyin.check / parse).'''
 
     def readings(self, *syllables):
         return [[s] for s in syllables]

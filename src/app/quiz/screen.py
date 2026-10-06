@@ -2,7 +2,7 @@ import random
 from pathlib import Path
 
 from src.vocabulary.hsk import HSKDictionary
-from src.vocabulary.vocab import VOCAB_DIR
+from ..wordlists import VOCAB_DIR
 
 from ..strokes import CharacterStrip, StrokeLook
 from ..tui import (BOLD, DIM, FILL, GREEN, RED, Align, Column, CommandInput, Key, Layers, Screen, Setting, Text,

@@ -1,4 +1,4 @@
-from ..pinyin_answers import check
+from src.vocabulary.pinyin import check
 from ..tui import DIM, FILL, Column, Text, Widget
 from .questions import QuestionMode
 
@@ -7,7 +7,7 @@ class Pinyin(QuestionMode):
     '''See a word or a character written stroke by stroke, type its pinyin.
 
     Tone marks or numbers both work, with or without spaces: wǒ or wo3,
-    nǐhǎo or ni3 hao3 (see pinyin_answers). The right pinyin is the HSK
+    nǐhǎo or ni3 hao3 (see vocabulary.pinyin.check). The right pinyin is the HSK
     word's; a character on its own can be any of its readings (好 hǎo or
     hào). Each syllable is marked right or wrong, with the right pinyin shown
     green or red. Each result also has 'guess': the syllable typed for that

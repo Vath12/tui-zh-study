@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.stroke.stroke import HanziStroke
 from src.vocabulary.hsk import HSKDictionary
-from src.vocabulary.vocab import VOCAB_DIR, load_vocab
+from ..wordlists import VOCAB_DIR, words_in
 
 MAX_CHARS = 4  # longest question, in characters
 BUILT_LEVELS = {'1', '2', '3'}  # HSK levels of the extra words built from your vocab
@@ -11,11 +11,11 @@ BUILT_LEVELS = {'1', '2', '3'}  # HSK levels of the extra words built from your 
 
 def question_pool(source : Path = VOCAB_DIR) -> list[str]:
     '''The words questions are made from: your vocab (a vocab file, or a
-    directory of them; see load_vocab), plus the HSK words (up to
+    directory of them; see wordlists.words_in), plus the HSK words (up to
     MAX_CHARS long, from BUILT_LEVELS) made only of characters in your vocab,
     like 爸爸 from 爸. Words with a character that has no stroke data or no
     pinyin are left out.'''
-    vocab = load_vocab(source)
+    vocab = words_in(source)
     known = set(''.join(vocab))
     HSKDictionary._load_lazy()
     HanziStroke._load_lazy()
