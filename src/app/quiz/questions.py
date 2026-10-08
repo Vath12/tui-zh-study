@@ -2,27 +2,19 @@ import random
 from pathlib import Path
 
 from src.stroke.stroke import HanziStroke
-from src.vocabulary.hsk import HSKDictionary
+from src.vocabulary.dictionary import Dictionary
 from ..wordlists import VOCAB_DIR, words_in
 
 MAX_CHARS = 4  # longest question, in characters
-BUILT_LEVELS = {'1', '2', '3'}  # HSK levels of the extra words built from your vocab
 
 
 def question_pool(source : Path = VOCAB_DIR) -> list[str]:
     '''The words questions are made from: your vocab (a vocab file, or a
-    directory of them; see wordlists.words_in), plus the HSK words (up to
-    MAX_CHARS long, from BUILT_LEVELS) made only of characters in your vocab,
-    like 爸爸 from 爸. Words with a character that has no stroke data or no
-    pinyin are left out.'''
-    vocab = words_in(source)
-    known = set(''.join(vocab))
-    HSKDictionary._load_lazy()
+    directory of them; see wordlists.words_in), up to MAX_CHARS long. Words
+    with a character that has no stroke data or no pinyin are left out.'''
     HanziStroke._load_lazy()
-    built = [w for w, entries in HSKDictionary.by_word.items()
-             if 1 < len(w) <= MAX_CHARS and set(w) <= known and entries[0].level in BUILT_LEVELS]
-    usable = lambda w: all(c in HanziStroke.stroke_data for c in w) and all(p for _, p in HSKDictionary.words_pinyin([w]))
-    return [w for w in dict.fromkeys(vocab + built) if len(w) <= MAX_CHARS and usable(w)]
+    usable = lambda w: all(c in HanziStroke.stroke_data for c in w) and all(p for _, p in Dictionary.char_readings(w))
+    return [w for w in words_in(source) if len(w) <= MAX_CHARS and usable(w)]
 
 
 class CharWeights:

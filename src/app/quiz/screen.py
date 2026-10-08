@@ -1,7 +1,7 @@
 import random
 from pathlib import Path
 
-from src.vocabulary.hsk import HSKDictionary
+from src.vocabulary.dictionary import Dictionary
 from ..wordlists import VOCAB_DIR
 
 from ..strokes import CharacterStrip, StrokeLook
@@ -64,7 +64,7 @@ class QuizScreen(Screen):
         self.words = make_question(self.pool, self.rng, self.weights)
         self.answer = ''.join(self.words)
         self.weights.asked(self.answer)
-        self.readings = HSKDictionary.words_pinyin(self.words)
+        self.readings = Dictionary.words_pinyin(self.words)
         self.strip.show(self.readings)
         self.state = 'answering' if self.mode == 'read' else 'writing'
         self.revealed = False

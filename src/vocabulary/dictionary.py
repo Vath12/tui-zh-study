@@ -12,6 +12,8 @@ RESOURCE_DIR = Path(__file__).parent.parent.parent / 'resources'
 CEDICT_PATH = RESOURCE_DIR / 'cc-cedict.tsv'
 FREQUENCY_PATH = RESOURCE_DIR / 'jun-da_frequency.tsv'
 
+MAX_SEGMENT = 8   # longest word segment() tries (CEDICT has some very long idioms)
+
 # The TSVs install.py writes.
 CEDICT_SCHEMA = {'simplified': pl.String, 'traditional': pl.String, 'pinyin': pl.String, 'definitions': pl.String}
 JUNDA_SCHEMA = {'char': pl.String, 'count': pl.Int64, 'pinyin': pl.String, 'english': pl.String}
@@ -61,6 +63,8 @@ class Dictionary():
 
     cedict : pl.DataFrame | None = None
     frequency : pl.DataFrame | None = None
+    words : frozenset[str] = frozenset()   # every simplified word, for segment()
+    longest : int = 1                      # characters in the longest word segment() looks for
 
     # When loading: leave out readings with no meaning, only notes (variant of ...,
     # see ..., used in ...), which have nothing to show, and words left with none.
@@ -86,6 +90,8 @@ class Dictionary():
         cls.cedict = cls.cedict.group_by('simplified', maintain_order=True).agg(
             'traditional', 'pinyin', 'pinyin_marked', 'definitions')
         cls._precompute_charset_hash()
+        cls.words = frozenset(cls.cedict['simplified'].to_list())
+        cls.longest = min(MAX_SEGMENT, max(map(len, cls.words)))
 
     @classmethod
     def _l_load_char_frequency(cls):
@@ -153,6 +159,69 @@ class Dictionary():
     def definitions(cls, word : str) -> list[str]:
         '''Every meaning of the word as text: (bound form) row; line.'''
         return [str(s) for s in cls.senses(word)]
+
+    @classmethod
+    @loaded
+    def char_readings(cls, word : str) -> list[tuple[str, list[str]]]:
+        '''Each character of a word with its readings there, in tone marks:
+        你好 -> [('你', ['nǐ']), ('好', ['hǎo'])], 好 -> [('好', ['hǎo', 'hào'])].
+        A word with several readings gives each character every one that
+        lines up with it. Text that isn't one word (我们的爸爸) is split into
+        words first (我们 的 爸爸), and a piece whose pinyin doesn't line up
+        (3D) gives each character its own readings. Readings are lowercase (中 Zhōng, as in China, is zhōng),
+        each once. Tones are as CEDICT gives them, with no sandhi (不客气 is
+        bù kè qi).'''
+        rows = cls.lookup(word).rows(named=True)
+        if rows:
+            options = [dict() for _ in word]
+            for pinyin in rows[0]['pinyin']:
+                syllables = pinyin.split()
+                if len(syllables) == len(word):
+                    for i, syl in enumerate(syllables):
+                        options[i][numbers_to_marks(syl).lower()] = None
+            if all(options):
+                return [(c, list(o)) for c, o in zip(word, options)]
+        if len(word) == 1:
+            return [(word, [])]
+        # Not a word (or no lined-up reading): split it into words if it can be, else characters.
+        pieces = cls.segment(word)
+        if len(pieces) == 1:
+            pieces = list(word)
+        return [pair for piece in pieces for pair in cls.char_readings(piece)]
+
+    @classmethod
+    @loaded
+    def words_pinyin(cls, words : list[str]) -> list[tuple[str, list[str]]]:
+        '''char_readings for each word, one after another.'''
+        return [pair for w in words for pair in cls.char_readings(w)]
+
+    @classmethod
+    @loaded
+    def segment(cls, text : str) -> list[str]:
+        '''Split text into dictionary words, in as few pieces as possible (so
+        longer words win). Anything that isn't part of a word is a piece of
+        its own, one character long.'''
+        # best[i]: (fewest pieces for text[:i], length of the last piece)
+        best = [(0, 0)] + [(len(text) + 1, 1)] * len(text)
+        for end in range(1, len(text) + 1):
+            for size in range(1, min(cls.longest, end) + 1):
+                if size > 1 and text[end - size:end] not in cls.words:
+                    continue
+                if best[end - size][0] + 1 < best[end][0]:
+                    best[end] = (best[end - size][0] + 1, size)
+        pieces, end = [], len(text)
+        while end:
+            size = best[end][1]
+            pieces.append(text[end - size:end])
+            end -= size
+        return pieces[::-1]
+
+    @classmethod
+    @loaded
+    def text_pinyin(cls, text : str) -> list[tuple[str, list[str]]]:
+        '''Each character of text with its readings in context: segment(), then
+        char_readings() for each piece (谢谢你 -> xiè, xie, nǐ).'''
+        return cls.words_pinyin(cls.segment(text))
 
     @classmethod
     @loaded

@@ -1,6 +1,6 @@
 import random
 
-from src.vocabulary.hsk import HSKDictionary
+from src.vocabulary.dictionary import Dictionary
 
 from ..quiz.questions import make_question
 from ..strokes import CharacterStrip, has_strokes
@@ -78,7 +78,7 @@ class QuestionMode(StudyMode):
     def usable(self, word : str) -> bool:
         if word not in self._usable:
             self._usable[word] = (len(word) <= self.max_chars and all(map(has_strokes, word))
-                                  and all(p for _, p in HSKDictionary.words_pinyin([word])))
+                                  and all(p for _, p in Dictionary.char_readings(word)))
         return self._usable[word]
 
     def pool(self) -> list[str]:
@@ -114,7 +114,7 @@ class QuestionMode(StudyMode):
 
     def show(self, question : dict):
         self.words = question['words']
-        self.readings = HSKDictionary.words_pinyin(self.words)
+        self.readings = Dictionary.words_pinyin(self.words)
         self.strip.show(self.readings)
         self.phase = 'answering'
 

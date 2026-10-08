@@ -1,8 +1,11 @@
 '''A testing ground for the TUI: an output area and a command line at the
 bottom. Tab pops a menu out on the left:
 
-  Identify, Writing, Translation, Pinyin, Mixture
+  Identify, Writing, Translation, Pinyin, Numeracy, Mixture, Dictionary
              the study modes (see modes/; the current one is marked).
+             Dictionary looks up what you type: its strokes and meanings.
+             Numeracy shows numbers in characters to type in digits; up and
+             down change its difficulty.
              Translation and Mixture aren't ready yet: they say so and just
              log what you type.
   Session    your sessions (see sessions.Sessions, saved in .data/): each one

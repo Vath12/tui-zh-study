@@ -1,4 +1,4 @@
-from src.vocabulary.hsk import HSKDictionary
+from src.vocabulary.dictionary import Dictionary
 
 from .strokes import CharacterStrip, StrokeLook, has_strokes
 from src.tui import DIM, Column, CommandInput, Screen, Setting, Text
@@ -41,7 +41,7 @@ class ViewerScreen(Screen):
     def text_changed(self, text : str):
         # Animate the last characters that have stroke data; leave the current
         # ones up if there aren't any (e.g. the input was just cleared).
-        chars = [(c, p) for c, p in HSKDictionary.text_pinyin(text) if has_strokes(c)]
+        chars = [(c, p) for c, p in Dictionary.text_pinyin(text) if has_strokes(c)]
         if chars:
             self.typed = chars
             self.strip.show(chars[-self.n_chars:])

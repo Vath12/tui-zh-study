@@ -25,7 +25,7 @@ MODELS = {
     'base-0.6b': 'mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16',
 }
 DEFAULT_MODEL = 'custom-0.6b'
-DEFAULT_VOICE = 'vivian'   # see TTS.speakers()
+DEFAULT_VOICE = 'ryan'   # see TTS.speakers()
 STREAM_INTERVAL = 0.32     # seconds of audio per streamed chunk (about 4 of the model's 12.5 Hz tokens)
 _DEFAULT_CACHE = object()
 
