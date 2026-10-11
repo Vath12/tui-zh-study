@@ -8,4 +8,4 @@ from .pinyin import Pinyin
 from .translation import Translation
 from .writing import Writing
 
-MODES : list[type[StudyMode]] = [Identify, Writing, Translation, Pinyin, Numeracy, Mixture, Lookup]
+MODES : list[type[StudyMode]] = [Identify, Writing, Pinyin, Numeracy, Lookup]
