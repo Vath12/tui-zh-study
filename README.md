@@ -1,4 +1,8 @@
-# Chinese
+# Disclaimer
+
+Very WIP, project's primary purpose is to study, being well written software is secondary to that goal.
+
+# Description
 
 A terminal app for learning to read and write Chinese characters. Characters
 are drawn stroke by stroke right in the terminal, and you're quizzed on your
