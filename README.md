@@ -16,7 +16,8 @@ how to read numbers.
 - Python 3.13 or newer, and [uv](https://docs.astral.sh/uv/).
 - A terminal with a Unicode font. The default "squares" drawing uses the
   Unicode 16 octant characters; if your font doesn't have them, switch to
-  "dots" (braille) in Options.
+  "dots" (braille) in Options. 
+  [I recommend ghostty](https://ghostty.org/)
 
 ## Setup
 
