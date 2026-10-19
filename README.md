@@ -60,7 +60,7 @@ where each file is, so editing the file updates the list.
 
 | Mode | What you do |
 |---|---|
-| Identify | See characters written stroke by stroke; type what they are. |
+| Identify | See characters written stroke by stroke; type what they are. Up and down change the difficulty: one word at a time, or a few together. |
 | Writing | See the pinyin; write the characters on paper, press Space to reveal the strokes, then mark yourself right or wrong (y/n). |
 | Pinyin | See a word; type its pinyin, with tone marks or numbers (`nǐhǎo`, `ni3 hao3`). |
 | Numeracy | See a number in characters (一千零五); type it in digits (1005). Up and down change the difficulty. |
